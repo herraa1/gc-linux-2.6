@@ -93,4 +93,5 @@ config MPC10X_STORE_GATHERING
 
 config GAMECUBE_COMMON
 	bool
+	select NOT_COHERENT_CACHE
 	default n
