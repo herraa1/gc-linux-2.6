@@ -234,6 +234,9 @@ void __init ug_udbg_init(void)
 	struct device_node *stdout;
 	const char *path;
 
+	if (ug_io_base)
+		udbg_printf("%s: early -> final\n", __func__);
+
 	if (!of_chosen) {
 		udbg_printf("%s: missing of_chosen\n", __func__);
 		goto done;
@@ -283,3 +286,33 @@ done:
 		of_node_put(np);
 	return;
 }
+
+#ifdef CONFIG_PPC_EARLY_DEBUG_USBGECKO
+
+/*
+ * USB Gecko early debug support initialization for udbg.
+ *
+ */
+void __init udbg_init_usbgecko(void)
+{
+	unsigned long vaddr, paddr;
+
+#if defined(CONFIG_GAMECUBE)
+	paddr = 0x0c000000;
+#elif defined(CONFIG_WII)
+	paddr = 0x0d000000;
+#else
+#error Invalid platform for USB Gecko based early debugging.
+#endif
+
+	vaddr = 0xc0000000 | paddr;
+	setbat(1, vaddr, paddr, 128*1024, _PAGE_IO);
+
+	ug_io_base = (void __iomem *)(vaddr | 0x6814);
+
+	udbg_putc = ug_udbg_putc;
+	udbg_getc = ug_udbg_getc;
+	udbg_getc_poll = ug_udbg_getc_poll;
+}
+
+#endif /* CONFIG_PPC_EARLY_DEBUG_USBGECKO */
