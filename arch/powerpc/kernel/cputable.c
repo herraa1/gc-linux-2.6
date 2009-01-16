@@ -697,11 +697,11 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
 	},
-	{	/* 750CL */
-		.pvr_mask		= 0xfffff0f0,
-		.pvr_value		= 0x00087010,
-		.cpu_name		= "750CL",
-		.cpu_features		= CPU_FTRS_750CL,
+	{	/* 745/755 */
+		.pvr_mask		= 0xfffff000,
+		.pvr_value		= 0x00083000,
+		.cpu_name		= "745/755",
+		.cpu_features		= CPU_FTRS_750,
 		.cpu_user_features	= COMMON_USER | PPC_FEATURE_PPC_LE,
 		.mmu_features		= MMU_FTR_HPTE_TABLE | MMU_FTR_USE_HIGH_BATS,
 		.icache_bsize		= 32,
@@ -714,11 +714,11 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.oprofile_cpu_type      = "ppc/750",
 		.oprofile_type		= PPC_OPROFILE_G4,
 	},
-	{	/* 745/755 */
-		.pvr_mask		= 0xfffff000,
-		.pvr_value		= 0x00083000,
-		.cpu_name		= "745/755",
-		.cpu_features		= CPU_FTRS_750,
+	{	/* 750CL (and "Broadway") */
+		.pvr_mask		= 0xfffff0e0,
+		.pvr_value		= 0x00087000,
+		.cpu_name		= "750CL",
+		.cpu_features		= CPU_FTRS_750CL,
 		.cpu_user_features	= COMMON_USER | PPC_FEATURE_PPC_LE,
 		.mmu_features		= MMU_FTR_HPTE_TABLE,
 		.icache_bsize		= 32,
