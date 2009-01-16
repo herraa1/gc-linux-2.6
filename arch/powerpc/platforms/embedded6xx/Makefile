@@ -7,3 +7,4 @@ obj-$(CONFIG_STORCENTER)	+= storcenter.o
 obj-$(CONFIG_PPC_HOLLY)		+= holly.o
 obj-$(CONFIG_PPC_PRPMC2800)	+= prpmc2800.o
 obj-$(CONFIG_PPC_C2K)		+= c2k.o
+obj-$(CONFIG_FLIPPER_PIC)	+= flipper-pic.o

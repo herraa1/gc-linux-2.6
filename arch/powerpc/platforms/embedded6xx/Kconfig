@@ -91,7 +91,12 @@ config MPC10X_STORE_GATHERING
 	bool "Enable MPC10x store gathering"
 	depends on MPC10X_BRIDGE
 
+config FLIPPER_PIC
+	bool
+	default n
+
 config GAMECUBE_COMMON
 	bool
 	select NOT_COHERENT_CACHE
+	select FLIPPER_PIC
 	default n
