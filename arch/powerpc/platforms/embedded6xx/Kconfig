@@ -99,6 +99,15 @@ config GAMECUBE
 	  Select GAMECUBE if configuring for the Nintendo GameCube.
 	  More information at: <http://gc-linux.sourceforge.net/>
 
+config WII
+	bool "Nintendo-Wii"
+	depends on EMBEDDED6xx
+	select GAMECUBE_COMMON
+	select PPC_LIB_RHEAP
+	help
+	  Select WII if configuring for the Nintendo Wii.
+	  More information at: <http://gc-linux.sourceforge.net/>
+
 config FLIPPER_PIC
 	bool
 	default n
