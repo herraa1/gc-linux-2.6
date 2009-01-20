@@ -166,3 +166,14 @@ config GAMECUBE_RSW
 
 	  If in doubt, say Y here.
 
+config WII_GPIO
+	bool "Nintendo Wii GPIO support"
+	depends on GPIOLIB
+	default y
+	help
+	  If you say yes to this option, support will be included for the
+	  Nintendo Wii GPIO lines that control, for example, the sensor
+	  bar IR leds, the front led, or the eject switch of the disk unit.
+
+	  If in doubt, say Y here.
+
