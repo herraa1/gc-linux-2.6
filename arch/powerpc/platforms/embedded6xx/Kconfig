@@ -155,3 +155,14 @@ config GAMECUBE_VIDEO_UDBG
 	  If in doubt, say N here.
 
 endchoice
+
+config GAMECUBE_RSW
+	bool "Nintendo GameCube/Wii reset switch/button"
+	depends on GAMECUBE_COMMON
+	default y
+	help
+	  If you say yes to this option, support will be included for the
+	  reset switch/button of the Nintendo GameCube/Wii.
+
+	  If in doubt, say Y here.
+
