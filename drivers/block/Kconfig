@@ -101,6 +101,17 @@ config GAMECUBE_DI
 	  To compile this driver as a module, choose M here: the
 	  module will be called gcn-di.
 
+config WII_MEM2
+	tristate "Nintendo Wii MEM2"
+	depends on WII
+	help
+	  This enables support for using the MEM2 found in the
+	  Nintendo Wii as a block device.
+	  Say Y if you want to include this driver in the kernel.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called rvl-mem2.
+
 config BLK_DEV_XD
 	tristate "XT hard disk support"
 	depends on ISA && ISA_DMA_API

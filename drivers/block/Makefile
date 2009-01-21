@@ -16,6 +16,7 @@ obj-$(CONFIG_AMIGA_Z2RAM)	+= z2ram.o
 obj-$(CONFIG_GAMECUBE_SD)	+= gcn-sd.o
 obj-$(CONFIG_GAMECUBE_ARAM)	+= gcn-aram.o
 obj-$(CONFIG_GAMECUBE_DI)	+= gcn-di/
+obj-$(CONFIG_WII_MEM2)		+= rvl-mem2.o
 obj-$(CONFIG_BLK_DEV_RAM)	+= brd.o
 obj-$(CONFIG_BLK_DEV_LOOP)	+= loop.o
 obj-$(CONFIG_BLK_DEV_XD)	+= xd.o
