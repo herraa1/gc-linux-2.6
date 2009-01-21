@@ -112,6 +112,22 @@ config WII_MEM2
 	  To compile this driver as a module, choose M here: the
 	  module will be called rvl-mem2.
 
+	config WII_SD
+	tristate "Nintendo Wii front slot MMC/SD"
+	depends on WII
+	help
+	  This enables support for MMC/SD cards using the front SD card
+	  slot of the Nintendo Wii.
+
+	  You probably want to compile FAT support, and the required
+	  codepages, or mount will complain. See Filesystems -> DOS/FAT/NT
+	  filesystems and Filesystems -> Native Language Support
+
+	  Say Y if you want to include this driver in the kernel.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called rvl-stsd.
+
 config BLK_DEV_XD
 	tristate "XT hard disk support"
 	depends on ISA && ISA_DMA_API
