@@ -573,6 +573,7 @@ static int si_init(struct si_drvdata *drvdata, struct resource *mem)
 	struct si_port *port;
 	int index;
 	int retval;
+	int error;
 
 	drvdata->io_base = ioremap(mem->start, mem->end - mem->start + 1);
 
@@ -584,10 +585,17 @@ static int si_init(struct si_drvdata *drvdata, struct resource *mem)
 		port->drvdata = drvdata;
 
 		retval = si_port_probe(port);
-		if (!retval)
-			input_register_device(port->idev);
-
-		drv_printk(KERN_INFO, "port %d: %s\n", index+1, port->name);
+		if (!retval) {
+			error = input_register_device(port->idev);
+			if (error) {
+				drv_printk(KERN_ERR,
+					   "input device registration failed"
+					   " (%d) for port %d", error, index+1);
+				port->idev = NULL;
+			} else
+				drv_printk(KERN_INFO, "port %d: %s\n",
+					   index+1, port->name);
+		}
 	}
 
 	si_setup_polling(drvdata);
