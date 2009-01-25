@@ -323,6 +323,7 @@ EXPORT_SYMBOL(exi_driver_unregister);
 static void exi_device_rescan(struct exi_device *exi_device)
 {
 	unsigned int id;
+	int error;
 
 	/* now ID the device */
 	id = exi_get_id(exi_device);
@@ -344,8 +345,12 @@ static void exi_device_rescan(struct exi_device *exi_device)
 			   exi_device->dev.bus_id,
 			   id, exi_name_id(id));
 		exi_device->eid.id = id;
-		device_register(&exi_device->dev);
-		drv_printk(KERN_INFO, "add completed\n");
+		error = device_register(&exi_device->dev);
+		if (error) {
+			drv_printk(KERN_INFO, "add failed (%d)\n", error);
+			exi_device->eid.id = EXI_ID_INVALID;
+		} else
+			drv_printk(KERN_INFO, "add completed\n");
 	}
 
 	exi_update_ext_status(exi_get_exi_channel(exi_device));
