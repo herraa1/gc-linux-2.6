@@ -1035,6 +1035,7 @@ static int sthcd_pep_xfer_callback(struct starlet_ipc_request *req)
 	struct urb *urb;
 	int retval;
 	unsigned long flags;
+	int error;
 
 	starlet_ipc_free_request(req);
 
@@ -1157,7 +1158,7 @@ static int sthcd_pep_xfer_callback(struct starlet_ipc_request *req)
 	BUG_ON(!sthcd);
 	BUG_ON(!urb);
 
-	int error = usb_hcd_check_unlink_urb(hcd, urb, status);
+	error = usb_hcd_check_unlink_urb(hcd, urb, status);
 	if (!error) {
 		usb_hcd_unlink_urb_from_ep(hcd, urb);
 

@@ -581,14 +581,15 @@ static int sd_write_data(struct sd_host *host, void *data, size_t len,
 			  int token)
 {
 	u16 crc;
-	u8 t;
+	u8 t, *d;
+	size_t l;
 	int retval = 0;
 
 	/* FIXME, rewrite this a bit */
 	{
 		crc = 0;
-		u8 *d = data;
-		int l = len;
+		d = data;
+		l = len;
 
 		while (l-- > 0)
 			crc = crc_xmodem_update(crc, *d++);
@@ -715,6 +716,8 @@ static int sd_generic_read(struct sd_host *host,
 {
 	struct sd_command *cmd = &host->cmd;
 	u16 crc, calc_crc = 0xffff;
+	u8 *d;
+	size_t l;
 	int retval;
 
 	/* build raw command */
@@ -742,8 +745,8 @@ static int sd_generic_read(struct sd_host *host,
 	/* FIXME, rewrite this a bit */
 	{
 		calc_crc = 0;
-		u8 *d = data;
-		int l = len;
+		d = data;
+		l = len;
 
 		while (l-- > 0)
 			calc_crc = crc_xmodem_update(calc_crc, *d++);
