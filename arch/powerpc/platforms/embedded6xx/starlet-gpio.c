@@ -96,6 +96,7 @@ int stgpio_add32(struct device_node *np)
 	struct of_gpio_chip *of_gc;
 	struct gpio_chip *gc;
 	struct stgpio_chip *st_gc;
+	const unsigned long *prop;
 
 	st_gc = kzalloc(sizeof(*st_gc), GFP_KERNEL);
 	if (!st_gc)
@@ -106,7 +107,11 @@ int stgpio_add32(struct device_node *np)
 	of_gc = &mm_gc->of_gc;
 	gc = &of_gc->gc;
 
-	of_gc->gpio_cells = 1;
+	prop = of_get_property(np, "#gpio-cells", NULL);
+	if (prop && *prop >= 2)
+		of_gc->gpio_cells = *prop;
+	else
+		of_gc->gpio_cells = 2; /* gpio pin number, flags */
 
 	gc->ngpio = 32;
 	gc->direction_input = stgpio_dir_in;
