@@ -345,6 +345,7 @@ static int aram_init_blk_dev(struct aram_drvdata *drvdata)
 	blk_queue_dma_alignment(queue, ARAM_DMA_ALIGN);
 	blk_queue_max_phys_segments(queue, 1);
 	blk_queue_max_hw_segments(queue, 1);
+	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, queue);
 	queue->queuedata = drvdata;
 	drvdata->queue = queue;
 
