@@ -200,6 +200,7 @@ static int mem2_init_blk_dev(struct mem2_drvdata *drvdata)
 	blk_queue_hardsect_size(queue, MEM2_SECTOR_SIZE);
 	blk_queue_max_phys_segments(queue, 1);
 	blk_queue_max_hw_segments(queue, 1);
+	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, queue);
 	queue->queuedata = drvdata;
 	drvdata->queue = queue;
 
