@@ -957,17 +957,18 @@ static unsigned long bba_calc_response(unsigned long val,
 				       struct bba_private *priv)
 {
 	u8 revid_0, revid_eth_0, revid_eth_1;
+	u8 i0, i1, i2, i3;
+	u8 c0, c1, c2, c3;
+
 	revid_0 = priv->revid;
 	revid_eth_0 = priv->__0x04_init[0];
 	revid_eth_1 = priv->__0x04_init[1];
 
-	u8 i0, i1, i2, i3;
 	i0 = val >> 24;
 	i1 = val >> 16;
 	i2 = val >> 8;
 	i3 = val;
 
-	u8 c0, c1, c2, c3;
 	c0 = (i0 + i1 * 0xc1 + 0x18 + revid_0) ^ (i3 * i2 + 0x90);
 	c1 = (i1 + i2 + 0x90) ^ (c0 + i0 - 0xc1);
 	c2 = (i2 + 0xc8) ^ (c0 + ((revid_eth_0 + revid_0 * 0x23) ^ 0x19));
