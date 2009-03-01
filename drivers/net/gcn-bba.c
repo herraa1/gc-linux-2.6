@@ -388,7 +388,7 @@ static int bba_setup_hardware(struct net_device *dev);
  */
 static int bba_open(struct net_device *dev)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 	int retval;
 
 	/* INTs are triggered on EXI channel 2 */
@@ -419,7 +419,7 @@ out:
  */
 static int bba_close(struct net_device *dev)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 
 	/* do not allow more packets to be queued */
 	netif_carrier_off(dev);
@@ -447,7 +447,7 @@ static int bba_close(struct net_device *dev)
  */
 static struct net_device_stats *bba_get_stats(struct net_device *dev)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 
 	return &priv->stats;
 }
@@ -458,7 +458,7 @@ static struct net_device_stats *bba_get_stats(struct net_device *dev)
  */
 static int bba_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 	unsigned long flags;
 	int retval = NETDEV_TX_OK;
 
@@ -499,7 +499,7 @@ out:
  */
 static int bba_tx_err(u8 status, struct net_device *dev)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 	int last_tx_errors = priv->stats.tx_errors;
 
 	if (status & BBA_TX_STATUS_TERR) {
@@ -536,7 +536,7 @@ static int bba_tx_err(u8 status, struct net_device *dev)
  */
 static int bba_tx(struct net_device *dev)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 	struct sk_buff *skb;
 	unsigned long flags;
 	int retval = NETDEV_TX_OK;
@@ -596,7 +596,7 @@ out:
  */
 static int bba_rx_err(u8 status, struct net_device *dev)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 	int last_rx_errors = priv->stats.rx_errors;
 
 	if (status == 0xff) {
@@ -645,7 +645,7 @@ static int bba_rx_err(u8 status, struct net_device *dev)
  */
 static int bba_rx(struct net_device *dev, int budget)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 	struct sk_buff *skb;
 	struct bba_descr descr;
 	int lrps, size;
@@ -779,7 +779,7 @@ static int bba_io_thread(void *bba_priv)
  */
 static void bba_interrupt(struct net_device *dev)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 	u8 ir, imr, status, lrps, ltps;
 	int loops = 0;
 
@@ -863,7 +863,7 @@ static void bba_retrieve_ether_addr(struct net_device *dev)
  */
 static void bba_reset_hardware(struct net_device *dev)
 {
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 
 	/* unknown, mx register 0x60 */
 	bba_out8(0x60, 0);
@@ -987,7 +987,7 @@ static int bba_event_handler(struct exi_channel *exi_channel,
 			     unsigned int event, void *dev0)
 {
 	struct net_device *dev = (struct net_device *)dev0;
-	struct bba_private *priv = (struct bba_private *)dev->priv;
+	struct bba_private *priv = netdev_priv(dev);
 	register u8 status, mask;
 
 	/* XXX mask all EXI glue interrupts */
@@ -1064,26 +1064,26 @@ static struct net_device *bba_dev;
 
 static inline void bba_select(void)
 {
-	struct bba_private *priv = (struct bba_private *)bba_dev->priv;
+	struct bba_private *priv = netdev_priv(bba_dev);
 	exi_dev_select(priv->exi_device);
 
 }
 
 static inline void bba_deselect(void)
 {
-	struct bba_private *priv = (struct bba_private *)bba_dev->priv;
+	struct bba_private *priv = netdev_priv(bba_dev);
 	exi_dev_deselect(priv->exi_device);
 }
 
 static inline void bba_read(void *data, size_t len)
 {
-	struct bba_private *priv = (struct bba_private *)bba_dev->priv;
+	struct bba_private *priv = netdev_priv(bba_dev);
 	return exi_dev_read(priv->exi_device, data, len);
 }
 
 static inline void bba_write(void *data, size_t len)
 {
-	struct bba_private *priv = (struct bba_private *)bba_dev->priv;
+	struct bba_private *priv = netdev_priv(bba_dev);
 	return exi_dev_write(priv->exi_device, data, len);
 }
 
@@ -1174,7 +1174,7 @@ static void __devexit bba_remove(struct exi_device *exi_device)
 	struct bba_private *priv;
 
 	if (dev) {
-		priv = (struct bba_private *)dev->priv;
+		priv = netdev_priv(dev);
 
 		kthread_stop(priv->io_thread);
 
