@@ -29,6 +29,9 @@
 #include <linux/tty.h>
 #include <linux/wait.h>
 #include <linux/io.h>
+#ifdef CONFIG_WII_AVE_RVL
+#include <linux/i2c.h>
+#endif
 
 #define DRV_MODULE_NAME   "gcn-vifb"
 #define DRV_DESCRIPTION   "Nintendo GameCube/Wii Video Interface (VI) driver"
@@ -440,6 +443,9 @@ struct vi_ctl {
 	struct vi_mode_timings timings;
 
 	struct fb_info *info;
+#ifdef CONFIG_WII_AVE_RVL
+	struct i2c_client *i2c_client;
+#endif
 };
 
 
@@ -528,6 +534,12 @@ static u32 pseudo_palette[17];
  *
  *
  */
+
+#ifdef CONFIG_WII_AVE_RVL
+static int vi_ave_setup(struct vi_ctl *ctl);
+static int vi_ave_get_video_format(struct vi_ctl *ctl,
+				   enum vi_video_format *fmt);
+#endif
 
 /* some glue to the gx side */
 static inline void gcngx_dispatch_vtrace(struct vi_ctl *ctl)
@@ -979,6 +991,7 @@ static void vi_detect_tv_mode(struct vi_ctl *ctl)
 	enum vi_video_format fmt;
 	int ntsc_idx, pal_idx;
 	u16 dcr;
+	int error;
 
 	dcr = in_be16(io_base + VI_DCR);
 
@@ -1007,7 +1020,23 @@ static void vi_detect_tv_mode(struct vi_ctl *ctl)
 	else if (force_tv == VI_TV_NTSC)
 		fmt = VI_FMT_NTSC;
 	else {
+#ifdef CONFIG_WII_AVE_RVL
+		/*
+		 * Look at the audio/video encoder to detect true PAL vs NTSC.
+		 */
+		error = vi_ave_get_video_format(ctl, &fmt);
+		if (error) {
+			guess = " (initial guess)";
+			if (force_tv == VI_TV_PAL ||
+			    pal_idx == VI_VM_PAL_576i50)
+				fmt = VI_FMT_PAL;
+			else
+				fmt = VI_FMT_NTSC;
+		}
+#else
+		error = 0;
 		fmt = vi_get_video_format(ctl);
+#endif
 	}
 	switch (fmt) {
 	case VI_FMT_PAL:
@@ -1111,6 +1140,10 @@ static int vi_setup_tv_mode(struct vi_ctl *ctl)
 	out_be16(io_base + VI_UNK1, 0x00ff);
 	out_be32(io_base + VI_UNK2, 0x00ff00ff);
 	out_be32(io_base + VI_UNK3, 0x00ff00ff);
+
+#ifdef CONFIG_WII_AVE_RVL
+	vi_ave_setup(ctl);
+#endif
 
 	return 0;
 }
@@ -1231,6 +1264,289 @@ static irqreturn_t vi_irq_handler(int irq, void *dev)
 
 	return IRQ_NONE;
 }
+
+#ifdef CONFIG_WII_AVE_RVL
+
+/*
+ * Audio/Video Encoder hardware support.
+ *
+ */
+
+/*
+ * I/O accessors.
+ */
+
+static int vi_ave_outs(struct i2c_client *client, u8 reg,
+		       void *data, size_t len)
+{
+	struct i2c_adapter *adap = client->adapter;
+	struct i2c_msg msg[1];
+	u8 buf[34];
+	s32 result;
+	int error = -EINVAL;
+
+	if (len > sizeof(buf)-1)
+		goto err_out;
+
+	buf[0] = reg;
+	memcpy(&buf[1], data, len);
+
+	msg[0].addr = client->addr;
+	msg[0].flags = client->flags & I2C_M_TEN;
+	msg[0].len = len+1;
+	msg[0].buf = buf;
+
+	result = i2c_transfer(adap, msg, 1);
+	if (result < 0)
+		error = result;
+	else if (result == 1)
+		error = 0;
+	else
+		error = -EIO;
+
+err_out:
+	if (error)
+		drv_printk(KERN_ERR, "RVL-AVE: "
+			   "error (%d) writing to register %02Xh\n",
+			   error, reg);
+	return error;
+}
+
+static int vi_ave_out8(struct i2c_client *client, u8 reg, u8 data)
+{
+	return vi_ave_outs(client, reg, &data, sizeof(data));
+}
+
+static int vi_ave_out16(struct i2c_client *client, u8 reg, u16 data)
+{
+	cpu_to_be16s(&data);
+	return vi_ave_outs(client, reg, &data, sizeof(data));
+}
+
+static int vi_ave_out32(struct i2c_client *client, u8 reg, u32 data)
+{
+	cpu_to_be32s(&data);
+	return vi_ave_outs(client, reg, &data, sizeof(data));
+}
+
+static int vi_ave_ins(struct i2c_client *client, u8 reg,
+		      void *data, size_t len)
+{
+	struct i2c_adapter *adap = client->adapter;
+	struct i2c_msg msg[2];
+	s32 result;
+	int error;
+
+	msg[0].addr = client->addr;
+	msg[0].flags = client->flags & I2C_M_TEN;
+	msg[0].len = sizeof(reg);
+	msg[0].buf = &reg;
+
+	msg[1].addr = client->addr;
+	msg[1].flags = (client->flags & I2C_M_TEN) | I2C_M_RD;
+	msg[1].len = len;
+	msg[1].buf = data;
+
+	result = i2c_transfer(adap, msg, 2);
+	if (result < 0)
+		error = result;
+	else if (result == 2)
+		error = 0;
+	else
+		error = -EIO;
+
+	if (error)
+		drv_printk(KERN_ERR, "RVL-AVE: "
+			   "error (%d) reading from register %02Xh\n",
+			   error, reg);
+
+	return error;
+}
+
+static int vi_ave_in8(struct i2c_client *client, u8 reg, u8 *data)
+{
+	return vi_ave_ins(client, reg, data, sizeof(*data));
+}
+
+
+/*
+ * Try to detect current video format.
+ */
+static int vi_ave_get_video_format(struct vi_ctl *ctl,
+				   enum vi_video_format *fmt)
+{
+	u8 val = 0xff;
+	int error = -ENODEV;
+
+	if (!ctl->i2c_client)
+		goto err_out;
+
+	error = vi_ave_in8(ctl->i2c_client, 0x01, &val);
+	if (error)
+		goto err_out;
+
+	if ((val & 0x1f) == 2)
+		*fmt = VI_FMT_PAL;
+	else
+		*fmt = VI_FMT_NTSC;
+err_out:
+	return error;
+}
+
+
+static u8 vi_ave_gamma[] = {
+	0x10, 0x00, 0x10, 0x00, 0x10, 0x00, 0x10, 0x00,
+	0x10, 0x00, 0x10, 0x00, 0x10, 0x20, 0x40, 0x60,
+	0x80, 0xa0, 0xeb, 0x10, 0x00, 0x20, 0x00, 0x40,
+	0x00, 0x60, 0x00, 0x80, 0x00, 0xa0, 0x00, 0xeb,
+	0x00
+};
+
+/*
+ * Initialize the audio/video encoder.
+ */
+static int vi_ave_setup(struct vi_ctl *ctl)
+{
+	struct i2c_client *client;
+	u8 macrovision[26];
+	int has_component;
+	u8 component, format, pal60;
+
+	if (!ctl->i2c_client)
+		return -ENODEV;
+
+	client = ctl->i2c_client;
+	memset(macrovision, 0, sizeof(macrovision));
+
+	has_component = vi_has_component_cable(ctl);
+
+	/*
+	 * Magic initialization sequence borrowed from libogc.
+	 */
+
+	vi_ave_out8(client, 0x6a, 1);
+	vi_ave_out8(client, 0x65, 1);
+
+	/*
+	 * NOTE
+	 * We _can't_ use the fmt field in DCR to derive "format" here.
+	 * DCR uses fmt=0 (NTSC) also for PAL 525 modes.
+	 */
+
+	format = 0;		/* default to NTSC */
+	if ((ctl->mode->flags & VI_VMF_PAL_COLOR) != 0)
+		format = 2;	/* PAL */
+	component = (has_component) ? 1<<5 : 0;
+	vi_ave_out8(client, 0x01, component | format);
+
+	vi_ave_out8(client, 0x00, 0);
+	vi_ave_out16(client, 0x71, 0x8e8e);
+	vi_ave_out8(client, 0x02, 7);
+	vi_ave_out16(client, 0x05, 0x0000);
+	vi_ave_out16(client, 0x08, 0x0000);
+	vi_ave_out32(client, 0x7a, 0x00000000);
+	vi_ave_outs(client, 0x40, macrovision, sizeof(macrovision));
+	vi_ave_out8(client, 0x0a, 0);
+	vi_ave_out8(client, 0x03, 1);
+	vi_ave_outs(client, 0x10, vi_ave_gamma, sizeof(vi_ave_gamma));
+	vi_ave_out8(client, 0x04, 1);
+
+	vi_ave_out32(client, 0x7a, 0x00000000);
+	vi_ave_out16(client, 0x08, 0x0000);
+
+	vi_ave_out8(client, 0x03, 1);
+
+	/* clear bit 1 otherwise red and blue get swapped  */
+	if (has_component)
+		vi_ave_out8(client, 0x62, 0);
+
+	/* PAL 480i/60 supposedly needs a "filter" */
+	pal60 = !!(format == 2 && ctl->mode->lines == 525);
+	vi_ave_out8(client, 0x6e, pal60);
+
+	return 0;
+}
+
+static struct vi_ctl *first_vi_ctl;
+static struct i2c_client *first_vi_ave;
+
+static int vi_attach_ave(struct vi_ctl *ctl, struct i2c_client *client)
+{
+	if (!ctl)
+		return -ENODEV;
+	if (!client)
+		return -EINVAL;
+
+	spin_lock(&ctl->lock);
+	if (!ctl->i2c_client) {
+		ctl->i2c_client = i2c_use_client(client);
+		spin_unlock(&ctl->lock);
+		drv_printk(KERN_INFO, "AVE-RVL support loaded\n");
+		return 0;
+	}
+	spin_unlock(&ctl->lock);
+	return -EBUSY;
+}
+
+static void vi_dettach_ave(struct vi_ctl *ctl)
+{
+	struct i2c_client *client;
+
+	if (!ctl)
+		return;
+
+	spin_lock(&ctl->lock);
+	if (ctl->i2c_client) {
+		client = ctl->i2c_client;
+		ctl->i2c_client = NULL;
+		spin_unlock(&ctl->lock);
+		i2c_release_client(client);
+		drv_printk(KERN_INFO, "AVE-RVL support unloaded\n");
+		return;
+	}
+	spin_unlock(&ctl->lock);
+}
+
+static int vi_ave_probe(struct i2c_client *client,
+			 const struct i2c_device_id *id)
+{
+	int error;
+
+	/* attach first a/v encoder to first framebuffer */
+	if (!first_vi_ave) {
+		first_vi_ave = client;
+		error = vi_attach_ave(first_vi_ctl, client);
+		if (!error) {
+			/* setup again the video mode using the a/v encoder */
+			vi_detect_tv_mode(first_vi_ctl);
+			vi_setup_tv_mode(first_vi_ctl);
+		}
+	}
+	return 0;
+}
+
+static int vi_ave_remove(struct i2c_client *client)
+{
+	if (first_vi_ave == client)
+		first_vi_ave = NULL;
+	return 0;
+}
+
+static const struct i2c_device_id vi_ave_id[] = {
+	{ "wii-ave-rvl", 0 },
+	{ }
+};
+
+static struct i2c_driver vi_ave_driver = {
+	.driver = {
+		.name	= DRV_MODULE_NAME,
+	},
+	.probe		= vi_ave_probe,
+	.remove		= vi_ave_remove,
+	.id_table	= vi_ave_id,
+};
+
+#endif /* CONFIG_WII_AVE_RVL */
 
 
 /*
@@ -1699,6 +2015,14 @@ static int __devinit vifb_do_probe(struct device *dev,
 		goto err_register_framebuffer;
 	}
 
+#ifdef CONFIG_WII_AVE_RVL
+	if (!first_vi_ctl)
+		first_vi_ctl = ctl;
+
+	/* try to attach the a/v encoder now */
+	vi_attach_ave(ctl, first_vi_ave);
+#endif
+
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
 	       info->node, info->fix.id);
 
@@ -1738,6 +2062,11 @@ static int __devexit vifb_do_remove(struct device *dev)
 	dev_set_drvdata(dev, NULL);
 	iounmap(ctl->io_base);
 
+#ifdef CONFIG_WII_AVE_RVL
+	vi_dettach_ave(ctl);
+	if (first_vi_ctl == ctl)
+		first_vi_ctl = NULL;
+#endif
 	framebuffer_release(info);
 	return 0;
 }
@@ -1871,12 +2200,21 @@ static int __init vifb_init_module(void)
 	error = vifb_setup(option);
 #endif
 
+#ifdef CONFIG_WII_AVE_RVL
+	error = i2c_add_driver(&vi_ave_driver);
+	if (error)
+		drv_printk(KERN_ERR, "failed to register AVE (%d)\n", error);
+#endif
+
 	return of_register_platform_driver(&vifb_of_driver);
 }
 
 static void __exit vifb_exit_module(void)
 {
 	of_unregister_platform_driver(&vifb_of_driver);
+#ifdef CONFIG_WII_AVE_RVL
+	i2c_del_driver(&vi_ave_driver);
+#endif
 }
 
 module_init(vifb_init_module);

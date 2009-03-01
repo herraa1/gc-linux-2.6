@@ -1659,6 +1659,15 @@ config FB_GAMECUBE
 	help
 	  This is the frame buffer device driver for the Nintendo GameCube.
 
+config WII_AVE_RVL
+	bool "Nintendo Wii audio/video encoder support"
+	depends on FB_GAMECUBE && WII
+	select I2C_GPIO
+	select I2C
+	help
+	  Say Y here to support the audio/video encoder found in the
+	  Nintendo Wii video game console.
+
 config FB_AU1100
 	bool "Au1100 LCD Driver"
 	depends on (FB = y) && MIPS && SOC_AU1100
