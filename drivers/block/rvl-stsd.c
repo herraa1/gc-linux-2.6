@@ -2058,6 +2058,7 @@ static int stsd_init_blk_dev(struct stsd_host *host)
 	blk_queue_max_hw_segments(queue, host->max_phys_segments);
 	blk_queue_max_sectors(queue, STSD_MAX_SECTORS); /* 16 * 512 = 8K */
 	blk_queue_dma_alignment(queue, STARLET_IPC_DMA_ALIGN);
+	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, queue);
 	queue->queuedata = host;
 	host->queue = queue;
 
