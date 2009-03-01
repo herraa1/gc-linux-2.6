@@ -36,6 +36,20 @@ static void i2c_gpio_setsda_val(void *data, int state)
 	gpio_set_value(pdata->sda_pin, state);
 }
 
+/*
+ * Toggle SDA by changing the output value of the pin, first making sure
+ * that the pin is configured as an output.
+ */
+static void i2c_gpio_setsda_val_dir(void *data, int state)
+{
+	struct i2c_gpio_platform_data *pdata = data;
+
+	if (!gpio_direction_is_output(pdata->sda_pin))
+		gpio_direction_output(pdata->sda_pin, state);
+	else
+		gpio_set_value(pdata->sda_pin, state);
+}
+
 /* Toggle SCL by changing the direction of the pin. */
 static void i2c_gpio_setscl_dir(void *data, int state)
 {
@@ -64,6 +78,19 @@ static int i2c_gpio_getsda(void *data)
 {
 	struct i2c_gpio_platform_data *pdata = data;
 
+	return gpio_get_value(pdata->sda_pin);
+}
+
+/*
+ * Read SDA value from the pin, first making sure that the pin is
+ * configured as an input.
+ */
+static int i2c_gpio_getsda_val_dir(void *data)
+{
+	struct i2c_gpio_platform_data *pdata = data;
+
+	if (gpio_direction_is_output(pdata->sda_pin))
+		gpio_direction_input(pdata->sda_pin);
 	return gpio_get_value(pdata->sda_pin);
 }
 
@@ -96,7 +123,10 @@ int i2c_gpio_adapter_probe(struct i2c_adapter *adap,
 
 	if (pdata->sda_is_open_drain) {
 		gpio_direction_output(pdata->sda_pin, 1);
-		bit_data->setsda = i2c_gpio_setsda_val;
+		if (pdata->sda_enforce_dir)
+			bit_data->setsda = i2c_gpio_setsda_val_dir;
+		else
+			bit_data->setsda = i2c_gpio_setsda_val;
 	} else {
 		gpio_direction_input(pdata->sda_pin);
 		bit_data->setsda = i2c_gpio_setsda_dir;
@@ -112,7 +142,10 @@ int i2c_gpio_adapter_probe(struct i2c_adapter *adap,
 
 	if (!pdata->scl_is_output_only)
 		bit_data->getscl = i2c_gpio_getscl;
-	bit_data->getsda = i2c_gpio_getsda;
+	if (pdata->sda_enforce_dir)
+		bit_data->getsda = i2c_gpio_getsda_val_dir;
+	else
+		bit_data->getsda = i2c_gpio_getsda;
 
 	if (pdata->udelay)
 		bit_data->udelay = pdata->udelay;

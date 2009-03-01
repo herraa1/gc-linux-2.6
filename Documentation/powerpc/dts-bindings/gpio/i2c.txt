@@ -4,6 +4,8 @@ Required properties:
 - compatible : should be "virtual,i2c-gpio".
 - gpios : should specify GPIOs used for SDA and SCL lines, in that order.
 - sda-is-open-drain : should be non-zero if SDA gpio is open-drain.
+- sda-enforce-dir : should be non-zero if SDA gpio must be configured for
+		    input before reading and for output before writing.
 - scl-is-open-drain : should be non-zero if SCL gpio is open-drain.
 - scl-is-output-only : should be non-zero if SCL is an output gpio only.
 - udelay : signal toggle delay. SCL frequency is (500 / udelay) kHz
@@ -27,6 +29,7 @@ i2c-video {
 		 &gpio0 11 0	/* SCL line */
 		>;
 	sda-is-open-drain = <1>;
+	sda-enforce-dir = <1>;
 	scl-is-open-drain = <1>;
 	scl-is-output-only = <1>;
 	udelay = <2>;

@@ -61,6 +61,9 @@ static int __devinit i2c_gpio_of_probe(struct of_device *odev,
 	prop = of_get_property(odev->node, "sda-is-open-drain", NULL);
 	if (prop)
 		pdata->sda_is_open_drain = *prop;
+	prop = of_get_property(odev->node, "sda-enforce-dir", NULL);
+	if (prop)
+		pdata->sda_enforce_dir = *prop;
 	prop = of_get_property(odev->node, "scl-is-open-drain", NULL);
 	if (prop)
 		pdata->scl_is_open_drain = *prop;
