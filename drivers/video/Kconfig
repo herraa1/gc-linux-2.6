@@ -1664,6 +1664,7 @@ config WII_AVE_RVL
 	depends on FB_GAMECUBE && WII
 	select I2C_GPIO
 	select I2C
+	default y
 	help
 	  Say Y here to support the audio/video encoder found in the
 	  Nintendo Wii video game console.
