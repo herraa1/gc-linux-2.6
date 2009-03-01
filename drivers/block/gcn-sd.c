@@ -1453,6 +1453,7 @@ static int sd_init_blk_dev(struct sd_host *host)
 	blk_queue_max_phys_segments(queue, 1);
 	blk_queue_max_hw_segments(queue, 1);
 	blk_queue_max_sectors(queue, 8);
+	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, queue);
 	queue->queuedata = host;
 	host->queue = queue;
 
