@@ -127,7 +127,7 @@ struct si_drvdata {
 static int si_force_keyboard_port = -1;
 
 #ifdef MODULE
-module_psi_named(force_keyboard_port, si_force_keyboard_port, int, 0644);
+module_param_named(force_keyboard_port, si_force_keyboard_port, int, 0644);
 MODULE_PARM_DESC(force_keyboard_port, "port n becomes a keyboard port if"
 		 " automatic identification fails");
 #else
