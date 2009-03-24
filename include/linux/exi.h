@@ -17,6 +17,8 @@
 #ifndef __EXI_H
 #define __EXI_H
 
+#ifdef CONFIG_GAMECUBE_EXI
+
 #include <linux/device.h>
 #include <linux/io.h>
 
@@ -111,6 +113,8 @@ static inline int exi_set_dying(struct exi_device *exi_device, int status)
 }
 
 extern u32 exi_get_id(struct exi_device *exi_device);
+
+extern void exi_quiesce(void);
 
 /*
  * EXpansion Interface channels.
@@ -326,6 +330,14 @@ static inline int exi_dev_set_freq(struct exi_device *dev, unsigned int freq)
 
 	return freq;
 }
+
+#else
+
+static inline void exi_quiesce(void)
+{
+}
+
+#endif /* CONFIG_GAMECUBE_EXI */
 
 #endif /* __EXI_H */
 

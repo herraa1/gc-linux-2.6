@@ -1364,6 +1364,11 @@ void exi_update_ext_status(struct exi_channel *exi_channel)
 		exi_channel->flags &= ~EXI_EXT;
 }
 
+void exi_hw_quiesce(void)
+{
+	exi_quiesce_all_channels(0);
+}
+
 /*
  * Pseudo-Internal. Initialize basic channel structures and hardware.
  */

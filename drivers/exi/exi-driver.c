@@ -421,6 +421,16 @@ static int exi_bus_thread(void *__unused)
 	return 0;
 }
 
+/**
+ * exi_quiesce() - quiesce EXI hardware
+ *
+ * Put the EXI hardware into a calm state.
+ */
+void exi_quiesce(void)
+{
+	exi_hw_quiesce();
+}
+
 /*
  *
  */

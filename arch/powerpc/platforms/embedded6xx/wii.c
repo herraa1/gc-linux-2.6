@@ -17,6 +17,7 @@
 #include <linux/irq.h>
 #include <linux/seq_file.h>
 #include <linux/kexec.h>
+#include <linux/exi.h>
 
 #include <asm/io.h>
 #include <asm/machdep.h>
@@ -91,7 +92,7 @@ static int __init wii_probe(void)
 #ifdef CONFIG_KEXEC
 static void wii_shutdown(void)
 {
-	/* currently not used */
+	exi_quiesce();
 }
 
 static int wii_machine_kexec_prepare(struct kimage *image)

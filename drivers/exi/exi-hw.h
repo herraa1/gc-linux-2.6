@@ -130,6 +130,8 @@ extern struct exi_device *exi_channel_owner(struct exi_channel *exi_channel);
 extern int exi_get_ext_line(struct exi_channel *exi_channel);
 extern void exi_update_ext_status(struct exi_channel *exi_channel);
 
+extern void exi_hw_quiesce(void);
+
 extern int exi_hw_init(char *name, struct resource *mem, unsigned int irq);
 extern void exi_hw_exit(struct resource *mem, unsigned int irq);
 
