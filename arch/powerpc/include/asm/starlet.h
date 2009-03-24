@@ -27,7 +27,6 @@
 
 #define STARLET_EINVAL	-4
 
-
 #define STARLET_IPC_DMA_ALIGN   0x1f /* 32 bytes */
 
 struct starlet_ipc_request;
@@ -184,16 +183,22 @@ extern void starlet_ipc_free_request(struct starlet_ipc_request *req);
 
 
 extern int starlet_open(const char *pathname, int flags);
+extern int starlet_open_polled(const char *pathname, int flags,
+			       unsigned long usecs);
 extern int starlet_close(int fd);
+extern int starlet_close_polled(int fd, unsigned long usecs);
 
 extern int starlet_ioctl(int fd, int request,
-			     void *ibuf, size_t ilen,
-			     void *obuf, size_t olen);
+			 void *ibuf, size_t ilen,
+			 void *obuf, size_t olen);
 extern int starlet_ioctl_nowait(int fd, int request,
-				    void *ibuf, size_t ilen,
-				    void *obuf, size_t olen,
-				    starlet_ipc_callback_t callback,
-				    void *arg);
+				void *ibuf, size_t ilen,
+				void *obuf, size_t olen,
+				starlet_ipc_callback_t callback,
+				void *arg);
+extern int starlet_ioctl_polled(int fd, int request,
+				void *ibuf, size_t ilen,
+				void *obuf, size_t olen, unsigned long usecs);
 
 extern int starlet_ioctlv(int fd, int request,
 			      unsigned int nents_in,
@@ -201,12 +206,18 @@ extern int starlet_ioctlv(int fd, int request,
 			      unsigned int nents_out,
 			      struct scatterlist *sgl_out);
 extern int starlet_ioctlv_nowait(int fd, int request,
-				     unsigned int nents_in,
-				     struct scatterlist *sgl_in,
-				     unsigned int nents_out,
-				     struct scatterlist *sgl_out,
-				     starlet_ipc_callback_t callback,
-				     void *arg);
+				 unsigned int nents_in,
+				 struct scatterlist *sgl_in,
+				 unsigned int nents_out,
+				 struct scatterlist *sgl_out,
+				 starlet_ipc_callback_t callback,
+				 void *arg);
+extern int starlet_ioctlv_polled(int fd, int request,
+				 unsigned int nents_in,
+				 struct scatterlist *sgl_in,
+				 unsigned int nents_out,
+				 struct scatterlist *sgl_out,
+				 unsigned long usecs);
 extern int starlet_ioctlv_and_reboot(int fd, int request,
 					 unsigned int nents_in,
 					 struct scatterlist *sgl_in,

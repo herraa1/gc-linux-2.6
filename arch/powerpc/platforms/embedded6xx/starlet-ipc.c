@@ -31,7 +31,7 @@
 #include <linux/string.h>
 #include <asm/io.h>
 #include <asm/bitops.h>
-
+#include <asm/time.h>
 #include <asm/starlet.h>
 
 
@@ -39,7 +39,7 @@
 #define DRV_DESCRIPTION		"Nintendo Wii starlet IPC driver"
 #define DRV_AUTHOR		"Albert Herranz"
 
-static char starlet_ipc_driver_version[] = "0.2i";
+static char starlet_ipc_driver_version[] = "0.3i";
 
 #define drv_printk(level, format, arg...) \
 	 printk(level DRV_MODULE_NAME ": " format , ## arg)
@@ -50,10 +50,10 @@ static char starlet_ipc_driver_version[] = "0.2i";
 #define STARLET_IPC_TXBUF	0x00	/* data from cpu to starlet */
 
 #define STARLET_IPC_CSR		0x04
-#define   STARLET_IPC_CSR_TSTART	(1<<0)	/* start transmit */
+#define   STARLET_IPC_CSR_TXSTART	(1<<0)	/* start transmit */
 #define   STARLET_IPC_CSR_TBEI		(1<<1)	/* tx buf empty int */
 #define   STARLET_IPC_CSR_RBFI		(1<<2)	/* rx buf full int */
-#define   STARLET_IPC_CSR_INT		(1<<3)	/* interrupt ack */
+#define   STARLET_IPC_CSR_RXRDY		(1<<3)	/* receiver ready */
 #define   STARLET_IPC_CSR_RBFIMASK	(1<<4)	/* rx buf full int mask */
 #define   STARLET_IPC_CSR_TBEIMASK	(1<<5)	/* tx buf empty int mask */
 
@@ -112,9 +112,9 @@ static inline u32 starlet_ipc_recvfrom(void __iomem *io_base)
 /*
  * Issue an end-of-interrupt sequence.
  */
-static void starlet_ipc_eoi(void __iomem *io_base)
+static void starlet_ipc_rx_ready(void __iomem *io_base)
 {
-	starlet_ipc_update_csr(io_base, STARLET_IPC_CSR_INT);
+	starlet_ipc_update_csr(io_base, STARLET_IPC_CSR_RXRDY);
 }
 
 /*
@@ -222,7 +222,7 @@ static void starlet_ipc_start_request(struct starlet_ipc_request *req)
 	spin_unlock_irqrestore(&ipc_dev->list_lock, flags);
 
 	starlet_ipc_sendto(io_base, (u32) req->dma_addr);
-	starlet_ipc_update_csr(io_base, STARLET_IPC_CSR_TSTART);
+	starlet_ipc_update_csr(io_base, STARLET_IPC_CSR_TXSTART);
 }
 
 static void starlet_ipc_complete_request(struct starlet_ipc_request *req)
@@ -233,6 +233,7 @@ static void starlet_ipc_complete_request(struct starlet_ipc_request *req)
 	spin_lock_irqsave(&ipc_dev->list_lock, flags);
 	list_del_init(&req->node);
 	ipc_dev->nr_outstanding--;
+	req->jiffies = 0;
 	spin_unlock_irqrestore(&ipc_dev->list_lock, flags);
 
 	starlet_ipc_debug_print_request(req);
@@ -256,9 +257,8 @@ static void starlet_ipc_submit_request(struct starlet_ipc_request *req)
 		list_add_tail(&req->node, &ipc_dev->pending_list);
 		ipc_dev->nr_pending++;
 		spin_unlock_irqrestore(&ipc_dev->list_lock, flags);
-	} else {
+	} else
 		starlet_ipc_start_request(req);
-	}
 }
 
 static struct starlet_ipc_request *
@@ -272,6 +272,7 @@ starlet_ipc_find_request_by_bus_addr(struct starlet_ipc_device *ipc_dev,
 	list_for_each_entry(req, &ipc_dev->outstanding_list, node) {
 		if (req && req->sig != ipc_dev->random_id) {
 			drv_printk(KERN_ERR, "IPC trash detected\n");
+			/* leak memory, we can't safely use it */
 			ipc_dev->nr_outstanding = 0;
 			INIT_LIST_HEAD(&ipc_dev->outstanding_list);
 			INIT_LIST_HEAD(&req->node);
@@ -310,19 +311,19 @@ static int starlet_ipc_dispatch_tbei(struct starlet_ipc_device *ipc_dev)
 		ipc_dev->nr_pending--;
 	}
 	spin_unlock_irqrestore(&ipc_dev->list_lock, flags);
-	if (req) {
+	if (req)
 		starlet_ipc_start_request(req);
-	} else {
+	else {
 		if (!test_and_clear_bit(__TX_INUSE, &ipc_dev->flags)) {
 			/* we get two consecutive TBEIs on reboot */
 			if (test_and_clear_bit(__REBOOT, &ipc_dev->flags)) {
 				req = ipc_dev->req;
 				ipc_dev->req = NULL;
 				if (req) {
-					starlet_ipc_complete_request(req);
 					req->result = 0;
+					starlet_ipc_complete_request(req);
 				}
-				starlet_ipc_eoi(io_base);
+				starlet_ipc_rx_ready(io_base);
 			}
 		}
 	}
@@ -344,13 +345,12 @@ static int starlet_ipc_dispatch_rbfi(struct starlet_ipc_device *ipc_dev)
 		return IRQ_NONE;
 
 	req = starlet_ipc_find_request_by_bus_addr(ipc_dev, req_bus_addr);
-	if (req) {
+	if (req)
 		starlet_ipc_complete_request(req);
-	} else {
+	else
 		drv_printk(KERN_WARNING, "unknown request, bus=%p\n",
 			   (void *)req_bus_addr);
-	}
-	starlet_ipc_eoi(io_base);
+	starlet_ipc_rx_ready(io_base);
 	return IRQ_HANDLED;
 }
 
@@ -432,6 +432,48 @@ static void starlet_ipc_call_nowait(struct starlet_ipc_request *req,
 	starlet_ipc_submit_request(req);
 }
 
+static DEFINE_SPINLOCK(starlet_ipc_poll_lock);
+
+#define __spin_event_timeout(condition, usecs, result, __end_ts) \
+	for (__end_ts = get_tbl() + tb_ticks_per_usec * usecs;	\
+	     !(result = (condition)) && __end_ts - get_tbl() > 0;)
+
+static int __starlet_ipc_poll_req(struct starlet_ipc_request *req,
+				  unsigned long usecs)
+{
+	struct starlet_ipc_device *ipc_dev = req->ipc_dev;
+	unsigned long counter;
+	int result;
+
+	__spin_event_timeout(req->jiffies == 0 &&
+			     !test_bit(__REBOOT, &ipc_dev->flags),
+			     usecs, result, counter)
+		starlet_ipc_handler(0, ipc_dev);
+
+	if (!result)
+		req->result = -ETIME;
+
+	/* debug */
+	if (req->result < 0)
+		drv_printk(KERN_ERR, "%s: result %d\n", __func__,
+			   req->result);
+	return req->result;
+}
+
+static int starlet_ipc_call_polled(struct starlet_ipc_request *req,
+				   unsigned long usecs)
+{
+	unsigned long flags;
+	int error;
+
+	req->done = NULL;
+	spin_lock_irqsave(&starlet_ipc_poll_lock, flags);
+	starlet_ipc_submit_request(req);
+	error = __starlet_ipc_poll_req(req, usecs);
+	spin_unlock_irqrestore(&starlet_ipc_poll_lock, flags);
+	return error;
+}
+
 /*
  *
  * IOS High level interfaces.
@@ -453,7 +495,8 @@ EXPORT_SYMBOL_GPL(starlet_ipc_get_device);
 /**
  *
  */
-int starlet_open(const char *pathname, int flags)
+static int _starlet_open(const char *pathname, int flags,
+			 gfp_t gfp_flags, int poll, unsigned long usecs)
 {
 #define STSD_OPEN_BUF_SIZE	64
 	static char open_buf[STSD_OPEN_BUF_SIZE]
@@ -470,7 +513,7 @@ int starlet_open(const char *pathname, int flags)
 	if (!ipc_dev)
 		return -ENODEV;
 
-	req = starlet_ipc_alloc_request(ipc_dev, GFP_KERNEL);
+	req = starlet_ipc_alloc_request(ipc_dev, gfp_flags);
 	if (req) {
 		len = strlen(pathname) + 1;
 		if (len < sizeof(open_buf)) {
@@ -478,7 +521,7 @@ int starlet_open(const char *pathname, int flags)
 				local_pathname = open_buf;
 		}
 		if (!local_pathname) {
-			local_pathname = starlet_kzalloc(len, GFP_KERNEL);
+			local_pathname = starlet_kzalloc(len, gfp_flags);
 			if (!local_pathname) {
 				starlet_ipc_free_request(req);
 				return -ENOMEM;
@@ -493,7 +536,8 @@ int starlet_open(const char *pathname, int flags)
 		req->cmd = STARLET_IOS_OPEN;
 		req->open.pathname = dma_addr;	/* bus address */
 		req->open.mode = flags;
-		error = starlet_ipc_call(req);
+		error = (poll) ? starlet_ipc_call_polled(req, usecs) :
+				 starlet_ipc_call(req);
 
 		dma_unmap_single(ipc_dev->dev, dma_addr, len, DMA_TO_DEVICE);
 
@@ -505,15 +549,29 @@ int starlet_open(const char *pathname, int flags)
 		starlet_ipc_free_request(req);
 	}
 	if (error < 0)
-		DBG("%s: error=%d (%x)\n", __func__, error, error);
+		DBG("%s: %s: error=%d (%x)\n", __func__, pathname,
+		    error, error);
 	return error;
 }
+
+int starlet_open(const char *pathname, int flags)
+{
+	return _starlet_open(pathname, flags, GFP_KERNEL, 0, 0);
+}
 EXPORT_SYMBOL_GPL(starlet_open);
+
+int starlet_open_polled(const char *pathname, int flags,
+			unsigned long usecs)
+{
+	return _starlet_open(pathname, flags, GFP_ATOMIC, 1, usecs);
+}
+EXPORT_SYMBOL_GPL(starlet_open_polled);
 
 /*
  *
  */
-int starlet_close(int fd)
+static int _starlet_close(int fd, gfp_t gfp_flags, int poll,
+			  unsigned long usecs)
 {
 	struct starlet_ipc_device *ipc_dev = starlet_ipc_get_device();
 	struct starlet_ipc_request *req;
@@ -522,16 +580,29 @@ int starlet_close(int fd)
 	if (!ipc_dev)
 		return -ENODEV;
 
-	req = starlet_ipc_alloc_request(ipc_dev, GFP_KERNEL);
+	req = starlet_ipc_alloc_request(ipc_dev, gfp_flags);
 	if (req) {
 		req->cmd = STARLET_IOS_CLOSE;
 		req->fd = fd;
-		error = starlet_ipc_call(req);
+		error = (poll) ? starlet_ipc_call_polled(req, usecs) :
+				 starlet_ipc_call(req);
 		starlet_ipc_free_request(req);
 	}
 	return error;
 }
+
+int starlet_close(int fd)
+{
+	return _starlet_close(fd, GFP_KERNEL, 0, 0);
+}
 EXPORT_SYMBOL_GPL(starlet_close);
+
+int starlet_close_polled(int fd, unsigned long usecs)
+{
+	return _starlet_close(fd, GFP_ATOMIC, 1, usecs);
+}
+EXPORT_SYMBOL_GPL(starlet_close_polled);
+
 
 
 /*
@@ -687,9 +758,10 @@ int starlet_ioctl_prepare(struct starlet_ipc_request *req,
 /**
  *
  */
-int starlet_ioctl(int fd, int request,
-		      void *ibuf, size_t ilen,
-		      void *obuf, size_t olen)
+static int _starlet_ioctl(int fd, int request,
+			  void *ibuf, size_t ilen,
+			  void *obuf, size_t olen,
+			  int poll, unsigned long usecs)
 {
 	struct starlet_ipc_device *ipc_dev = starlet_ipc_get_device();
 	struct starlet_ipc_request *req;
@@ -702,14 +774,31 @@ int starlet_ioctl(int fd, int request,
 	error = starlet_ioctl_prepare(req, fd, request,
 					  ibuf, ilen, obuf, olen);
 	if (!error)
-		error = starlet_ipc_call(req);
+		error = (poll) ? starlet_ipc_call_polled(req, usecs) :
+				 starlet_ipc_call(req);
 	starlet_ipc_free_request(req);
 
 	if (error < 0)
 		DBG("%s: error=%d (%x)\n", __func__, error, error);
 	return error;
 }
+
+int starlet_ioctl(int fd, int request,
+		  void *ibuf, size_t ilen,
+		  void *obuf, size_t olen)
+{
+	return _starlet_ioctl(fd, request, ibuf, ilen, obuf, olen, 0, 0);
+}
 EXPORT_SYMBOL_GPL(starlet_ioctl);
+
+int starlet_ioctl_polled(int fd, int request,
+			 void *ibuf, size_t ilen,
+			 void *obuf, size_t olen,
+			 unsigned long usecs)
+{
+	return _starlet_ioctl(fd, request, ibuf, ilen, obuf, olen, 1, usecs);
+}
+EXPORT_SYMBOL_GPL(starlet_ioctl_polled);
 
 /**
  *
@@ -880,11 +969,12 @@ int starlet_ioctlv_prepare(struct starlet_ipc_request *req,
 /**
  *
  */
-int starlet_ioctlv(int fd, int request,
-		       unsigned int nents_in,
-		       struct scatterlist *sgl_in,
-		       unsigned int nents_io,
-		       struct scatterlist *sgl_io)
+static int _starlet_ioctlv(int fd, int request,
+			   unsigned int nents_in,
+			   struct scatterlist *sgl_in,
+			   unsigned int nents_io,
+			   struct scatterlist *sgl_io,
+			   int poll, unsigned long usecs)
 {
 	struct starlet_ipc_device *ipc_dev = starlet_ipc_get_device();
 	struct starlet_ipc_request *req;
@@ -898,14 +988,37 @@ int starlet_ioctlv(int fd, int request,
 					   nents_in, sgl_in,
 					   nents_io, sgl_io);
 	if (!error)
-		error = starlet_ipc_call(req);
+		error = (poll) ? starlet_ipc_call_polled(req, usecs) :
+				 starlet_ipc_call(req);
 	starlet_ipc_free_request(req);
 
 	if (error < 0)
 		DBG("%s: error=%d (%x)\n", __func__, error, error);
 	return error;
 }
+
+int starlet_ioctlv(int fd, int request,
+		       unsigned int nents_in,
+		       struct scatterlist *sgl_in,
+		       unsigned int nents_io,
+		       struct scatterlist *sgl_io)
+{
+	return _starlet_ioctlv(fd, request,
+			       nents_in, sgl_in, nents_io, sgl_io, 0, 0);
+}
 EXPORT_SYMBOL_GPL(starlet_ioctlv);
+
+int starlet_ioctlv_polled(int fd, int request,
+			  unsigned int nents_in,
+			  struct scatterlist *sgl_in,
+			  unsigned int nents_io,
+			  struct scatterlist *sgl_io,
+			  unsigned long usecs)
+{
+	return _starlet_ioctlv(fd, request,
+			       nents_in, sgl_in, nents_io, sgl_io, 1, usecs);
+}
+EXPORT_SYMBOL_GPL(starlet_ioctlv_polled);
 
 /**
  *
@@ -943,10 +1056,10 @@ EXPORT_SYMBOL_GPL(starlet_ioctlv_nowait);
  *
  */
 int starlet_ioctlv_and_reboot(int fd, int request,
-				  unsigned int nents_in,
-				  struct scatterlist *sgl_in,
-				  unsigned int nents_io,
-				  struct scatterlist *sgl_io)
+			      unsigned int nents_in,
+			      struct scatterlist *sgl_in,
+			      unsigned int nents_io,
+			      struct scatterlist *sgl_io)
 {
 	struct starlet_ipc_device *ipc_dev = starlet_ipc_get_device();
 	struct starlet_ipc_request *req;
@@ -957,12 +1070,12 @@ int starlet_ioctlv_and_reboot(int fd, int request,
 		return -ENOMEM;
 
 	error = starlet_ioctlv_prepare(req, fd, request,
-					   nents_in, sgl_in,
-					   nents_io, sgl_io);
+				       nents_in, sgl_in,
+				       nents_io, sgl_io);
 	if (!error) {
 		ipc_dev->req = req;
 		set_bit(__REBOOT, &ipc_dev->flags);
-		error = starlet_ipc_call(req);
+		error = starlet_ipc_call_polled(req, 10000000 /* usecs */);
 	}
 	starlet_ipc_free_request(req);
 
