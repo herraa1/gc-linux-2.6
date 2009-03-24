@@ -93,6 +93,7 @@ static int __init wii_probe(void)
 static void wii_shutdown(void)
 {
 	exi_quiesce();
+	flipper_quiesce();
 }
 
 static int wii_machine_kexec_prepare(struct kimage *image)

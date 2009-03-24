@@ -112,6 +112,13 @@ static struct irq_host_ops flipper_irq_host_ops = {
  *
  */
 
+static void __flipper_quiesce(void __iomem *io_base)
+{
+	/* mask and ack all IRQs */
+	out_be32(io_base + FLIPPER_IMR, 0x00000000);
+	out_be32(io_base + FLIPPER_ICR, 0xffffffff);
+}
+
 struct irq_host * __init flipper_pic_init(struct device_node *np)
 {
 	struct irq_host *irq_host;
@@ -129,9 +136,7 @@ struct irq_host * __init flipper_pic_init(struct device_node *np)
 	drv_printk(KERN_INFO, "controller at 0x%08x mapped to 0x%p\n",
 		   res.start, io_base);
 
-	/* mask and ack all IRQs */
-	out_be32(io_base + FLIPPER_IMR, 0x00000000);
-	out_be32(io_base + FLIPPER_ICR, 0xffffffff);
+	__flipper_quiesce(io_base);
 
 	irq_host = irq_alloc_host(np, IRQ_HOST_MAP_LINEAR, FLIPPER_NR_IRQS,
 				  &flipper_irq_host_ops, -1);
@@ -184,6 +189,19 @@ void __init flipper_pic_probe(void)
  * Misc functions related to the flipper chipset.
  *
  */
+
+/**
+ * flipper_quiesce() - quiesce flipper irq controller
+ *
+ * Mask and ack all interrupt sources.
+ *
+ */
+void flipper_quiesce(void)
+{
+	void __iomem *io_base = flipper_irq_host->host_data;
+
+	__flipper_quiesce(io_base);
+}
 
 /*
  * Resets the platform.
