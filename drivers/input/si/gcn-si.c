@@ -114,6 +114,9 @@ struct si_port {
 };
 
 struct si_drvdata {
+	unsigned long flags;
+#define SI_QUIESCE	(1<<0)
+
 	struct si_port ports[SI_MAX_PORTS];
 
 	void __iomem *io_base;
@@ -148,7 +151,7 @@ __setup("force_keyboard_port=", si_force_keyboard_port_setup);
  *
  */
 
-static void si_reset(void __iomem *io_base)
+static void si_reset_all(void __iomem *io_base)
 {
 	int i;
 
@@ -351,7 +354,8 @@ static void si_timer(unsigned long data)
 
 	input_sync(port->idev);
 
-	mod_timer(&port->timer, jiffies + SI_REFRESH_TIME);
+	if (!(port->drvdata->flags & SI_QUIESCE))
+		mod_timer(&port->timer, jiffies + SI_REFRESH_TIME);
 }
 
 /*
@@ -487,8 +491,6 @@ static int si_port_probe(struct si_port *port)
 	struct input_dev *idev;
 	int retval = 0;
 
-	si_reset(io_base);
-
 	/*
 	 * Determine input device type from SI id.
 	 */
@@ -577,6 +579,7 @@ static int si_init(struct si_drvdata *drvdata, struct resource *mem)
 
 	drvdata->io_base = ioremap(mem->start, mem->end - mem->start + 1);
 
+	si_reset_all(drvdata->io_base);
 	for (index = 0; index < SI_MAX_PORTS; ++index) {
 		port = &drvdata->ports[index];
 
@@ -659,6 +662,20 @@ static int si_do_remove(struct device *dev)
 	return -ENODEV;
 }
 
+static int si_do_shutdown(struct device *dev)
+{
+	struct si_drvdata *drvdata = dev_get_drvdata(dev);
+	int i;
+
+	if (drvdata) {
+		drvdata->flags |= SI_QUIESCE;
+		for (i = 0; i < SI_MAX_PORTS; ++i)
+			del_timer_sync(&drvdata->ports[i].timer);
+		si_reset_all(drvdata->io_base);
+	}
+	return 0;
+}
+
 
 /*
  * OF platform driver hooks.
@@ -685,6 +702,11 @@ static int __exit si_of_remove(struct of_device *odev)
 	return si_do_remove(&odev->dev);
 }
 
+static int si_of_shutdown(struct of_device *odev)
+{
+	return si_do_shutdown(&odev->dev);
+}
+
 static struct of_device_id si_of_match[] = {
 	{ .compatible = "nintendo,flipper-serial" },
 	{ .compatible = "nintendo,hollywood-serial" },
@@ -700,6 +722,7 @@ static struct of_platform_driver si_of_driver = {
 	.match_table = si_of_match,
 	.probe = si_of_probe,
 	.remove = si_of_remove,
+	.shutdown = si_of_shutdown,
 };
 
 
