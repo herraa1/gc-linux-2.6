@@ -2082,6 +2082,19 @@ static int __devexit vifb_do_remove(struct device *dev)
 	return 0;
 }
 
+static int vifb_do_shutdown(struct device *dev)
+{
+	struct fb_info *info = dev_get_drvdata(dev);
+	struct vi_ctl *ctl = info->par;
+	void __iomem *io_base = ctl->io_base;
+
+	vi_enable_interrupts(ctl, 0);
+	vi_reset_video(ctl);
+	out_be16(io_base + VI_DCR, vi_dcr_enb(0));
+
+	return 0;
+}
+
 #ifndef MODULE
 
 static int __devinit vifb_setup(char *options)
@@ -2170,6 +2183,11 @@ static int __exit vifb_of_remove(struct of_device *odev)
 	return vifb_do_remove(&odev->dev);
 }
 
+static int vifb_of_shutdown(struct of_device *odev)
+{
+	return vifb_do_shutdown(&odev->dev);
+}
+
 
 static struct of_device_id vifb_of_match[] = {
 	{ .compatible = "nintendo,flipper-video", },
@@ -2185,6 +2203,7 @@ static struct of_platform_driver vifb_of_driver = {
 	.match_table = vifb_of_match,
 	.probe = vifb_of_probe,
 	.remove = vifb_of_remove,
+	.shutdown = vifb_of_shutdown,
 };
 
 /*
