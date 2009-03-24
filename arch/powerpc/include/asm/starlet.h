@@ -25,6 +25,8 @@
 #include <linux/timer.h>
 #include <asm/rheap.h>
 
+#define STARLET_TITLE_HBC	0x0001000148415858ULL
+
 #define STARLET_EINVAL	-4
 
 #define STARLET_IPC_DMA_ALIGN   0x1f /* 32 bytes */

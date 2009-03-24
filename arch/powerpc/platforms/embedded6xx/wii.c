@@ -32,18 +32,26 @@
 
 static void wii_restart(char *cmd)
 {
-	starlet_stm_restart();
 	local_irq_disable();
-	/* spin until power button pressed */
+
+	/* try first to launch The Homebrew Channel... */
+	starlet_es_reload_ios_and_launch(STARLET_TITLE_HBC);
+	/* ..and if that fails, try an assisted restart */
+	starlet_stm_restart();
+
+	/* fallback to spinning until the power button pressed */
 	for (;;)
 		cpu_relax();
 }
 
 static void wii_power_off(void)
 {
-	starlet_stm_power_off();
 	local_irq_disable();
-	/* spin until power button pressed */
+
+	/* try an assisted poweroff */
+	starlet_stm_power_off();
+
+	/* fallback to spinning until the power button pressed */
 	for (;;)
 		cpu_relax();
 }
@@ -86,10 +94,24 @@ static void wii_shutdown(void)
 	/* currently not used */
 }
 
-static int wii_kexec_prepare(struct kimage *image)
+static int wii_machine_kexec_prepare(struct kimage *image)
 {
 	return 0;
 }
+
+static void wii_machine_kexec(struct kimage *image)
+{
+	local_irq_disable();
+
+	/*
+	 * Reload IOS to make sure that I/O resources are freed before
+	 * the final kexec phase.
+	 */
+	starlet_es_reload_ios_and_discard();
+
+	default_machine_kexec(image);
+}
+
 #endif /* CONFIG_KEXEC */
 
 
@@ -108,8 +130,8 @@ define_machine(wii) {
 	.progress		= udbg_progress,
 #ifdef CONFIG_KEXEC
 	.machine_shutdown	= wii_shutdown,
-	.machine_kexec_prepare	= wii_kexec_prepare,
-	.machine_kexec		= default_machine_kexec,
+	.machine_kexec_prepare	= wii_machine_kexec_prepare,
+	.machine_kexec		= wii_machine_kexec,
 #endif
 };
 
