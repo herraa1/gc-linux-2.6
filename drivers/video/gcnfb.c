@@ -980,6 +980,16 @@ static inline int vi_video_format_is_ntsc(struct vi_ctl *ctl)
 	return vi_get_video_format(ctl) == VI_FMT_NTSC;
 }
 
+static void vi_reset_video(struct vi_ctl *ctl)
+{
+	void __iomem *io_base = ctl->io_base;
+	u16 dcr;
+
+	dcr = in_be16(io_base + VI_DCR);
+	out_be16(io_base + VI_DCR, vi_dcr_set_rst(dcr, 1));
+	out_be16(io_base + VI_DCR, vi_dcr_clear_rst(dcr));
+}
+
 /*
  * Try to determine current TV video mode.
  */
@@ -1968,6 +1978,7 @@ static int __devinit vifb_do_probe(struct device *dev,
 	spin_lock_init(&ctl->lock);
 	init_waitqueue_head(&ctl->vtrace_waitq);
 
+	vi_reset_video(ctl);
 	vi_detect_tv_mode(ctl);
 
 	/* by default, start with overscan compensation */
