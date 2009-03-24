@@ -39,6 +39,7 @@ static const char starlet_es_driver_version[] = "0.2i";
 
 struct starlet_es_device {
 	int fd;
+	u64 ios_title;
 
 	struct device *dev;
 };
@@ -363,6 +364,90 @@ out:
 	return error;
 }
 
+/*
+ * This call may be used in a non-sleeping context
+ */
+static int __starlet_es_reload_ios(struct starlet_es_device *es_dev)
+{
+	int error = -EINVAL;
+
+	if (!es_dev->ios_title) {
+		drv_printk(KERN_ERR, "no IOS previously loaded\n");
+		goto out;
+	}
+
+	error = starlet_es_launch_title(es_dev, es_dev->ios_title);
+	if (!error)
+		es_dev->fd = -1;
+out:
+	return error;
+}
+
+/*
+ * This call may be used in a non-sleeping context
+ */
+static int starlet_es_reload_ios(struct starlet_es_device *es_dev)
+{
+	int error;
+
+	error = __starlet_es_reload_ios(es_dev);
+	if (!error)
+		error = starlet_es_reopen(es_dev);
+
+	if (error)
+		DBG("%s: error=%d (%08x)\n", __func__, error, error);
+	return error;
+}
+
+
+/**
+ * starlet_es_reload_ios_and_discard() - reload IOS and stop using it
+ *
+ * Reloads the version of IOS loaded at boot time.
+ * All IOS dependent devices will fail after this call unless they are
+ * reinitialized.
+ *
+ * This call may be used in a non-sleeping context
+ */
+int starlet_es_reload_ios_and_discard(void)
+{
+	struct starlet_es_device *es_dev = starlet_es_get_device();
+	int error = -EINVAL;
+
+	if (!es_dev)
+		goto err_out;
+
+	error = starlet_es_reload_ios(es_dev);
+err_out:
+	return error;
+}
+EXPORT_SYMBOL_GPL(starlet_es_reload_ios_and_discard);
+
+/**
+ * starlet_es_reload_ios_and_launch() - reload IOS and launch a title
+ *
+ * Reload the version of IOS loaded at boot time and launch a title.
+ * If the title loaded is a non-IOS title, this function will not return and
+ * is equivalent to a platform restart.
+ *
+ * This call may be used in a non-sleeping context
+ */
+int starlet_es_reload_ios_and_launch(u64 title)
+{
+	struct starlet_es_device *es_dev = starlet_es_get_device();
+	int error = -EINVAL;
+
+	if (!es_dev)
+		goto err_out;
+
+	error = starlet_es_reload_ios(es_dev);
+	if (!error)
+		error = starlet_es_launch_title(es_dev, title);
+err_out:
+	return error;
+}
+EXPORT_SYMBOL_GPL(starlet_es_reload_ios_and_launch);
+
 static int starlet_es_find_newest_title(struct starlet_es_device *es_dev,
 					u64 *title,
 					u64 title_min, u64 title_max)
@@ -418,6 +503,7 @@ static int starlet_es_load_preferred_ios(struct starlet_es_device *es_dev,
 	if (!error)
 		return -EINVAL;
 	if (error > 0) {
+		es_dev->ios_title = title;
 		error = starlet_es_launch_title(es_dev, title);
 		if (!error)
 			error = starlet_es_reopen(es_dev);

@@ -237,6 +237,11 @@ extern int starlet_ioh_ioctlv_nowait(int fd, int request,
 				     starlet_ipc_callback_t callback,
 				     void *arg);
 
+/* from starlet-es.c */
+
+extern int starlet_es_reload_ios_and_discard(void);
+extern int starlet_es_reload_ios_and_launch(u64 title);
+
 /* from starlet-stm.c */
 
 extern void starlet_stm_restart(void);
