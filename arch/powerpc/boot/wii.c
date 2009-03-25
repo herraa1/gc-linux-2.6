@@ -132,6 +132,42 @@ _mmu_on:\n\
 	b _zimage_start_lib\n\
 ");
 
+static int save_lowmem_stub(void)
+{
+	void *src, *dst;
+	size_t size;
+	u32 reg[2];
+	u32 v;
+	void *devp;
+
+	devp = finddevice("/lowmem-stub");
+	if (devp == NULL) {
+		printf("lowmem-stub: none\n");
+		goto err_out;
+	}
+
+	if (getprop(devp, "reg", reg, sizeof(reg)) != sizeof(reg)) {
+		printf("unable to find %s property\n", "reg");
+		goto err_out;
+	}
+	src = (void *)reg[0];
+	size = reg[1];
+	if (getprop(devp, "save-area", &v, sizeof(v)) != sizeof(v)) {
+		printf("unable to find %s property\n", "save-area");
+		goto err_out;
+	}
+	dst = (void *)v;
+
+	printf("lowmem-stub: relocating from %08lX to %08lX (%u bytes)\n",
+		(unsigned long)src, (unsigned long)dst, size);
+	memcpy(dst, src, size);
+	flush_cache(dst, size);
+
+	return 0;
+err_out:
+	return -1;
+}
+
 /*
  *
  */
@@ -144,5 +180,7 @@ void platform_init(unsigned long r3, unsigned long r4, unsigned long r5)
 
 	if (!ug_grab_io_base() && ug_is_adapter_present())
 		console_ops.write = ug_console_write;
+
+	save_lowmem_stub();
 }
 
