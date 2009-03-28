@@ -441,6 +441,7 @@ struct vi_ctl {
 
 	struct vi_tv_mode *mode;
 	struct vi_mode_timings timings;
+	int has_component_cable:1;	/* at last detection time */
 
 	struct fb_info *info;
 #ifdef CONFIG_WII_AVE_RVL
@@ -1005,10 +1006,12 @@ static void vi_detect_tv_mode(struct vi_ctl *ctl)
 
 	dcr = in_be16(io_base + VI_DCR);
 
+	ctl->has_component_cable = vi_has_component_cable(ctl);
+
 	if ((force_scan == VI_SCAN_PROGRESSIVE &&
-					vi_has_component_cable(ctl)) ||
+					ctl->has_component_cable) ||
 	    (force_scan != VI_SCAN_INTERLACED &&
-					vi_has_component_cable(ctl) &&
+					ctl->has_component_cable &&
 					vi_dcr_get_nin(dcr))) {
 		/* progressive modes */
 		ntsc_idx = VI_VM_NTSC_480p;
@@ -1074,10 +1077,19 @@ static int vi_setup_tv_mode(struct vi_ctl *ctl)
 {
 	void __iomem *io_base = ctl->io_base;
 	struct vi_mode_timings *timings = &ctl->timings;
-	struct vi_tv_mode *mode = ctl->mode;
 	struct fb_var_screeninfo *var = &ctl->info->var;
 	unsigned int bytes_per_pixel = var->bits_per_pixel / 8;
+	struct vi_tv_mode *mode;
+	int has_component_cable;
 	u16 std, ppl;
+
+	/* we need to re-detect the tv mode if the cable type changes */
+	has_component_cable = vi_has_component_cable(ctl);
+	if ((ctl->has_component_cable && !has_component_cable) ||
+	    (!ctl->has_component_cable && has_component_cable))
+		vi_detect_tv_mode(ctl);
+
+	mode = ctl->mode;
 
 	out_be16(io_base + VI_DCR,
 		 vi_dcr_fmt((mode->lines == 625) ? VI_FMT_PAL : VI_FMT_NTSC) |
@@ -1419,7 +1431,6 @@ static int vi_ave_setup(struct vi_ctl *ctl)
 {
 	struct i2c_client *client;
 	u8 macrovision[26];
-	int has_component;
 	u8 component, format, pal60;
 
 	if (!ctl->i2c_client)
@@ -1427,8 +1438,6 @@ static int vi_ave_setup(struct vi_ctl *ctl)
 
 	client = ctl->i2c_client;
 	memset(macrovision, 0, sizeof(macrovision));
-
-	has_component = vi_has_component_cable(ctl);
 
 	/*
 	 * Magic initialization sequence borrowed from libogc.
@@ -1446,7 +1455,7 @@ static int vi_ave_setup(struct vi_ctl *ctl)
 	format = 0;		/* default to NTSC */
 	if ((ctl->mode->flags & VI_VMF_PAL_COLOR) != 0)
 		format = 2;	/* PAL */
-	component = (has_component) ? 1<<5 : 0;
+	component = (ctl->has_component_cable) ? 1<<5 : 0;
 	vi_ave_out8(client, 0x01, component | format);
 
 	vi_ave_out8(client, 0x00, 0);
@@ -1467,7 +1476,7 @@ static int vi_ave_setup(struct vi_ctl *ctl)
 	vi_ave_out8(client, 0x03, 1);
 
 	/* clear bit 1 otherwise red and blue get swapped  */
-	if (has_component)
+	if (ctl->has_component_cable)
 		vi_ave_out8(client, 0x62, 0);
 
 	/* PAL 480i/60 supposedly needs a "filter" */
@@ -1761,7 +1770,7 @@ static int vifb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	var->nonstd = 0;	/* lies... */
 
 	/* enable non-interlaced mode if supported */
-	if (force_scan != VI_SCAN_INTERLACED && vi_has_component_cable(ctl)) {
+	if (force_scan != VI_SCAN_INTERLACED && ctl->has_component_cable) {
 		var->vmode = (mode->flags & VI_VMF_PROGRESSIVE) ?
 					FB_VMODE_NONINTERLACED :
 					FB_VMODE_INTERLACED;
