@@ -99,7 +99,7 @@ static void mem2_do_request(struct request_queue *q)
 				}
 				error = 0;
 			}
-			blk_end_request(req, error, len);
+			__blk_end_request(req, error, len);
 		} else {
 			end_request(req, 0);
 		}
