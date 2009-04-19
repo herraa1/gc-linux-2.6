@@ -37,8 +37,8 @@ _zimage_start:\n\
 \n\
 	mfmsr	9\n\
 	andi.	0, 9, (1<<4)|(1<<5) /* MSR_DR|MSR_IR */\n\
-	bcl	20,31,1f\n\
-1:\n\
+	bcl	20, 31, 1f\n\
+1: \n\
 	mflr	8\n\
 	clrlwi	8, 8, 3		/* convert to a real address */\n\
 	addi	8, 8, _mmu_off - 1b\n\
@@ -47,7 +47,7 @@ _zimage_start:\n\
 	mtspr	0x01b, 9	/* SRR1 */\n\
 	sync\n\
 	rfi\n\
-_mmu_off:\n\
+_mmu_off: \n\
 	/* MMU disabled */\n\
 \n\
 	/* Setup BATs */\n\
@@ -96,7 +96,7 @@ _mmu_off:\n\
 	mtspr	0x219, 9	/* DBAT0L */\n\
 \n\
 	lis	8, 0xcc00	/* I/O mem */\n\
-	ori	8,8, 0x3ff	/* 32MiB */\n\
+	ori	8, 8, 0x3ff	/* 32MiB */\n\
 	lis	9, 0x0c00\n\
 	ori	9, 9, 0x002a	/* uncached, guarded, rw */\n\
 	mtspr	0x21a, 8	/* DBAT1U */\n\
@@ -114,12 +114,22 @@ _mmu_off:\n\
 	sync\n\
 	isync\n\
 \n\
+	/* enable high BATs */\n\
+	lis	8, 0x8200\n\
+	mtspr	0x3f3, 8	/* HID4 */\n\
+\n\
+	/* enable caches */\n\
+	mfspr	8, 0x3f0\n\
+	ori	8, 8, 0xc000\n\
+	mtspr	0x3f0, 8	/* HID0 */\n\
+	isync\n\
+\n\
 	li	3, 0\n\
 	li	4, 0\n\
 	li	5, 0\n\
 \n\
-	bcl	20,31,1f\n\
-1:\n\
+	bcl	20, 31, 1f\n\
+1: \n\
 	mflr    8\n\
 	addi    8, 8, _mmu_on - 1b\n\
 	mfmsr	9\n\
@@ -128,7 +138,13 @@ _mmu_off:\n\
 	mtspr	0x01b, 9	/* SRR1 */\n\
 	sync\n\
 	rfi\n\
-_mmu_on:\n\
+_mmu_on: \n\
+	/* turn on the front blue led (aka: yay! we got here!) */\n\
+	lis	8, 0xcd00\n\
+	ori	8, 8, 0x00c0\n\
+	lwz	9, 0(8)\n\
+	ori	9, 9, 0x20\n\
+	stw	9, 0(8)\n\
 	b _zimage_start_lib\n\
 ");
 
