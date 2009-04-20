@@ -51,19 +51,16 @@ EXPORT_SYMBOL(exi_bus_type);
 
 static struct device exi_bus_devices[EXI_MAX_CHANNELS] = {
 	[0] = {
-		.bus_id = "exi0",
+		.init_name = "exi0",
 		.release = exi_bus_device_release,
-		.parent = NULL
 	},
 	[1] = {
-		.bus_id = "exi1",
+		.init_name = "exi1",
 		.release = exi_bus_device_release,
-		 .parent = NULL
 	},
 	[2] = {
-		.bus_id = "exi2",
+		.init_name = "exi2",
 		.release = exi_bus_device_release,
-		.parent = NULL
 	},
 };
 
@@ -178,12 +175,11 @@ static void exi_device_init(struct exi_device *exi_device,
 	exi_device->eid.channel = channel;
 	exi_device->eid.device = device;
 	exi_device->frequency = EXI_FREQ_SCAN;
-
 	exi_device->exi_channel = to_exi_channel(channel);
 
 	exi_device->dev.parent = &exi_bus_devices[channel];
 	exi_device->dev.bus = &exi_bus_type;
-	sprintf(exi_device->dev.bus_id, "exi%01x:%01x", channel, device);
+	dev_set_name(&exi_device->dev, "exi%01x:%01x", channel, device);
 	exi_device->dev.platform_data = to_exi_channel(channel);
 	exi_device->dev.release = exi_device_release;
 }
@@ -331,7 +327,7 @@ static void exi_device_rescan(struct exi_device *exi_device)
 	if (exi_device->eid.id != EXI_ID_INVALID) {
 		/* device removed or changed */
 		drv_printk(KERN_INFO, "about to remove [%s] id=0x%08x %s\n",
-			   exi_device->dev.bus_id,
+			   dev_name(&exi_device->dev),
 			   exi_device->eid.id,
 			   exi_name_id(exi_device->eid.id));
 		device_unregister(&exi_device->dev);
@@ -342,7 +338,7 @@ static void exi_device_rescan(struct exi_device *exi_device)
 	if (id != EXI_ID_INVALID) {
 		/* a new device has been found */
 		drv_printk(KERN_INFO, "about to add [%s] id=0x%08x %s\n",
-			   exi_device->dev.bus_id,
+			   dev_name(&exi_device->dev),
 			   id, exi_name_id(id));
 		exi_device->eid.id = id;
 		error = device_register(&exi_device->dev);
