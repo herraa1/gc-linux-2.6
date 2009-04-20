@@ -20,6 +20,7 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
+#include <linux/dma-mapping.h>
 
 #define DRV_MODULE_NAME	"exi"
 #define DRV_DESCRIPTION	"Nintendo GameCube/Wii EXternal Interface (EXI) driver"
@@ -181,6 +182,7 @@ static void exi_device_init(struct exi_device *exi_device,
 	exi_device->dev.bus = &exi_bus_type;
 	dev_set_name(&exi_device->dev, "exi%01x:%01x", channel, device);
 	exi_device->dev.platform_data = to_exi_channel(channel);
+	set_dma_ops(&exi_device->dev, &dma_direct_ops);
 	exi_device->dev.release = exi_device_release;
 }
 
