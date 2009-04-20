@@ -306,7 +306,7 @@ void __init udbg_init_usbgecko(void)
 #endif
 
 	vaddr = 0xc0000000 | paddr;
-	setbat(1, vaddr, paddr, 128*1024, _PAGE_IO);
+	setbat(1, vaddr, paddr, 128*1024, PAGE_KERNEL_NCG);
 
 	ug_io_base = (void __iomem *)(vaddr | 0x6814);
 
