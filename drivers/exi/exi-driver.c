@@ -441,6 +441,13 @@ static int exi_init(struct resource *mem, unsigned int irq)
 	if (retval)
 		goto err_hw_init;
 
+	/* register root devices */
+	for (channel = 0; channel < EXI_MAX_CHANNELS; ++channel) {
+		retval = device_register(&exi_bus_devices[channel]);
+		if (retval)
+			goto err_device_register;
+	}
+
 	/* initialize devices */
 	for (channel = 0; channel < EXI_MAX_CHANNELS; ++channel) {
 		exi_channel = to_exi_channel(channel);
@@ -448,13 +455,6 @@ static int exi_init(struct resource *mem, unsigned int irq)
 			exi_device = &exi_devices[channel][device];
 			exi_device_init(exi_device, channel, device);
 		}
-	}
-
-	/* register root devices */
-	for (channel = 0; channel < EXI_MAX_CHANNELS; ++channel) {
-		retval = device_register(&exi_bus_devices[channel]);
-		if (retval)
-			goto err_device_register;
 	}
 
 	/* register the bus */
