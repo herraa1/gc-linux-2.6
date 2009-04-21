@@ -33,7 +33,11 @@
 
 		/* root filesystem on 2nd partition of SD card, whiite style  */
 		bootargs = "nobats root=/dev/rvlsda2 video=gcnfb force_keyboard_port=4 placeholder_for_additional_kernel_options_targetted_at_hexedit_lovers";
-		linux,stdout-path = "/exi@0d006800/usbgecko@0d006814";
+		linux,stdout-path = &USBGECKO0;
+	};
+
+	aliases {
+		ugecon = &USBGECKO0;
 	};
 
 	lowmem-stub {
@@ -66,29 +70,6 @@
 		};
 	};
 
-	pic: pic@0c003000 {
-		#interrupt-cells = <1>;
-		compatible = "nintendo,flipper-pic";
-		reg = <0c003000 8>;
-		interrupt-controller;
-	};
-
-	/* External Interface bus */
-	exi@0d006800 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		compatible = "nintendo,hollywood-exi";
-		reg = <0d006800 40>;
-		interrupts = <04>;
-		interrupt-parent = <&pic>;
-
-		udbg_console: usbgecko@0d006814 {
-			compatible = "usbgecko,usbgecko";
-			reg = <0d006814 14>;
-			virtual-reg = <cd006814>;
-		};
-	};
-
 	/* devices contained in the hollywood chipset */
 	soc {
 		#address-cells = <1>;
@@ -109,6 +90,13 @@
 			interrupt-parent = <&pic>;
 			xfb-start = <01698000>; /* end-of-mem1 - xfb-size */
 			xfb-size = <168000>;	/* 640x576x2 x 2 bytes */
+		};
+
+		pic: pic@0c003000 {
+			#interrupt-cells = <1>;
+			compatible = "nintendo,flipper-pic";
+			reg = <0c003000 8>;
+			interrupt-controller;
 		};
 
 		resetswitch@0c003000 {
@@ -133,11 +121,20 @@
 			interrupt-parent = <&pic>;
 		};
 
-		gpio0: starlet-gpio@0d8000c0 {
-			compatible = "nintendo,starlet-gpio";
-			reg = <0d8000c0 4>;
-			gpio-controller;
-			#gpio-cells = <2>;
+		/* External Interface bus */
+		exi@0d006800 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "nintendo,hollywood-exi";
+			reg = <0d006800 40>;
+			interrupts = <04>;
+			interrupt-parent = <&pic>;
+
+			USBGECKO0: usbgecko@0d006814 {
+				compatible = "usbgecko,usbgecko";
+				reg = <0d006814 14>;
+				virtual-reg = <cd006814>;
+			};
 		};
 
 		starlet-ipc@0d000000 {
@@ -147,22 +144,28 @@
 			interrupts = <0e>;
 			interrupt-parent = <&pic>;
 
+			starlet-es {
+				compatible = "nintendo,starlet-es";
+			};
+
+			starlet-sd {
+				compatible = "nintendo,starlet-sd";
+			};
+
+			starlet-hcd {
+				compatible = "nintendo,starlet-hcd";
+			};
+
+			starlet-keyboard {
+				compatible = "nintendo,starlet-keyboard";
+			};
 		};
 
-		starlet-es {
-			compatible = "nintendo,starlet-es";
-		};
-
-		starlet-sd {
-			compatible = "nintendo,starlet-sd";
-		};
-
-		starlet-keyboard {
-			compatible = "nintendo,starlet-keyboard";
-		};
-
-		starlet-hcd {
-			compatible = "nintendo,starlet-hcd";
+		gpio0: starlet-gpio@0d8000c0 {
+			compatible = "nintendo,starlet-gpio";
+			reg = <0d8000c0 4>;
+			gpio-controller;
+			#gpio-cells = <2>;
 		};
 
 		i2c-video {
@@ -186,3 +189,4 @@
 		};
 	};
 };
+

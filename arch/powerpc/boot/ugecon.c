@@ -114,7 +114,7 @@ int ug_grab_io_base(void)
 	u32 v;
 	void *devp;
 
-	devp = finddevice("/exi/usbgecko");
+	devp = find_node_by_alias("ugecon");
 	if (devp == NULL)
 		goto err_out;
 	if (getprop(devp, "virtual-reg", &v, sizeof(v)) != sizeof(v))

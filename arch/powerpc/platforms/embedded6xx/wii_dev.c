@@ -20,6 +20,7 @@
 
 static struct of_device_id wii_of_bus[] = {
 	{ .compatible = "nintendo,hollywood", },
+	{ .compatible = "nintendo,starlet-ipc", },
 	{ },
 };
 
