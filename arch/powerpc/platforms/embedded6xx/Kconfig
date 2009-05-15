@@ -120,7 +120,13 @@ config STARLET_MINI
 
 config FLIPPER_PIC
 	bool
-	default n
+	depends on GAMECUBE_COMMON
+	default y
+
+config HOLLYWOOD_PIC
+	bool
+	depends on STARLET_MINI
+	default y
 
 config GAMECUBE_COMMON
 	bool

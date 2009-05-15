@@ -14,6 +14,7 @@ obj-$(CONFIG_STARLET_MINI)	+= starlet-mipc.o
 obj-$(CONFIG_STARLET_IOS)	+= starlet-ipc.o starlet-malloc.o \
 					starlet-stm.o starlet-es.o
 obj-$(CONFIG_FLIPPER_PIC)	+= flipper-pic.o
+obj-$(CONFIG_HOLLYWOOD_PIC)	+= hollywood-pic.o
 obj-$(CONFIG_USBGECKO_UDBG)	+= usbgecko_udbg.o
 obj-$(CONFIG_GAMECUBE_VIDEO_UDBG)	+= gcnvi_udbg.o
 obj-$(CONFIG_GAMECUBE_RSW)	+= gcn-rsw.o

@@ -178,6 +178,15 @@
 
 			ranges = <0d040000 0d040000 00050000
 				  0d800000 0d800000 00001000>;
+
+			PIC1: pic1@0d800030 {
+				#interrupt-cells = <1>;
+				compatible = "nintendo,hollywood-pic";
+				reg = <0d800030 8>;
+				interrupt-controller;
+				interrupts = <0e>;
+				interrupt-parent = <&PIC0>;
+			};
 		};
 
 		gpio0: starlet-gpio@0d8000c0 {
