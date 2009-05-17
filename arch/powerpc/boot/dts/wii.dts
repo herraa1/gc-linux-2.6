@@ -88,12 +88,12 @@
 			compatible = "nintendo,hollywood-video";
 			reg = <0c002000 100>;
 			interrupts = <08>;
-			interrupt-parent = <&pic>;
+			interrupt-parent = <&PIC0>;
 			xfb-start = <01698000>; /* end-of-mem1 - xfb-size */
 			xfb-size = <168000>;	/* 640x576x2 x 2 bytes */
 		};
 
-		pic: pic@0c003000 {
+		PIC0: pic0@0c003000 {
 			#interrupt-cells = <1>;
 			compatible = "nintendo,flipper-pic";
 			reg = <0c003000 8>;
@@ -104,7 +104,7 @@
 			compatible = "nintendo,hollywood-resetswitch";
 			reg = <0c003000 4>;
 			interrupts = <01>;
-			interrupt-parent = <&pic>;
+			interrupt-parent = <&PIC0>;
 		};
 
 		audio@0c005000 {
@@ -112,14 +112,14 @@
 			reg = <0c005000 200	/* DSP */
 			       0d006c00 20>;	/* AI */
 			interrupts = <06>;
-			interrupt-parent = <&pic>;
+			interrupt-parent = <&PIC0>;
 		};
 
 		serial@0d006400 {
 			compatible = "nintendo,hollywood-serial";
 			reg = <0d006400 100>;
 			interrupts = <03>;
-			interrupt-parent = <&pic>;
+			interrupt-parent = <&PIC0>;
 		};
 
 		/* External Interface bus */
@@ -129,7 +129,7 @@
 			compatible = "nintendo,hollywood-exi";
 			reg = <0d006800 40>;
 			interrupts = <04>;
-			interrupt-parent = <&pic>;
+			interrupt-parent = <&PIC0>;
 
 			USBGECKO0: usbgecko@0d006814 {
 				compatible = "usbgecko,usbgecko";
@@ -146,7 +146,7 @@
 			reg = <0d000000 40	/* IPC */
 			       133e0000 20000>;	/* MEM2 ioh 128K */
 			interrupts = <0e>;
-			interrupt-parent = <&pic>;
+			interrupt-parent = <&PIC0>;
 
 			starlet-ios-es {
 				compatible = "nintendo,starlet-ios-es";
