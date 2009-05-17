@@ -1559,7 +1559,7 @@ static int starlet_ipc_of_shutdown(struct of_device *odev)
 }
 
 static struct of_device_id starlet_ipc_of_match[] = {
-	{ .compatible = "nintendo,starlet-ipc" },
+	{ .compatible = "nintendo,starlet-ios-ipc" },
 	{ },
 };
 

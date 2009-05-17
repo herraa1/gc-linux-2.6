@@ -26,7 +26,7 @@
 
 	chosen {
 		/* ramdisk */
-		/* bootargs = "nobats root=/dev/ram0 video=gcnfb:tv=NTSC ip=on force_keyboard_port=4"; */
+		/* bootargs = "nobats root=/dev/ram0 video=gcnfb ip=on force_keyboard_port=4"; */
 
 		/* nfsroot */
 		/* bootargs = "nobats root=/dev/nfs nfsroot=192.168.001.253:/nfsroot/cube ip=on video=gcnfb:tv=NTSC force_keyboard_port=4"; */
@@ -137,27 +137,30 @@
 			};
 		};
 
-		starlet-ipc@0d000000 {
-			compatible = "nintendo,starlet-ipc";
+		/*
+		 * Firmware interfaces accessible through Nintendo IOS IPC.
+		 */
+		starlet-ios-ipc@0d000000 {
+			compatible = "nintendo,starlet-ios-ipc";
 			reg = <0d000000 40	/* IPC */
 			       133e0000 20000>;	/* MEM2 ioh 128K */
 			interrupts = <0e>;
 			interrupt-parent = <&pic>;
 
-			starlet-es {
-				compatible = "nintendo,starlet-es";
+			starlet-ios-es {
+				compatible = "nintendo,starlet-ios-es";
 			};
 
-			starlet-sd {
-				compatible = "nintendo,starlet-sd";
+			starlet-ios-sd {
+				compatible = "nintendo,starlet-ios-sd";
 			};
 
-			starlet-hcd {
-				compatible = "nintendo,starlet-hcd";
+			starlet-ios-hcd {
+				compatible = "nintendo,starlet-ios-hcd";
 			};
 
-			starlet-keyboard {
-				compatible = "nintendo,starlet-keyboard";
+			starlet-ios-keyboard {
+				compatible = "nintendo,starlet-ios-keyboard";
 			};
 		};
 

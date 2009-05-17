@@ -1,7 +1,7 @@
 /*
  * arch/powerpc/platforms/embedded6xx/starlet-es.c
  *
- * Nintendo Wii starlet ES routines
+ * Nintendo Wii starlet ES driver
  * Copyright (C) 2008-2009 The GameCube Linux Team
  * Copyright (C) 2008,2009 Albert Herranz
  *
@@ -23,7 +23,7 @@
 #define DRV_DESCRIPTION		"Nintendo Wii starlet ES driver"
 #define DRV_AUTHOR		"Albert Herranz"
 
-static const char starlet_es_driver_version[] = "0.2i";
+static const char starlet_es_driver_version[] = "0.3i";
 
 #define DBG(fmt, arg...)	pr_debug(fmt, ##arg)
 
@@ -631,7 +631,7 @@ static int starlet_es_of_remove(struct of_device *odev)
 }
 
 static struct of_device_id starlet_es_of_match[] = {
-	{ .compatible = "nintendo,starlet-es" },
+	{ .compatible = "nintendo,starlet-ios-es" },
 	{ },
 };
 

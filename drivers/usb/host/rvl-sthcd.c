@@ -44,7 +44,7 @@
 #define DRV_AUTHOR      "Maarten ter Huurne, " \
 			"Albert Herranz"
 
-static char sthcd_driver_version[] = "0.4i";
+static char sthcd_driver_version[] = "0.5i";
 
 #define drv_printk(level, format, arg...) \
 	printk(level DRV_MODULE_NAME ": " format , ## arg)
@@ -2328,7 +2328,7 @@ static int __exit sthcd_of_remove(struct of_device *odev)
 }
 
 static struct of_device_id sthcd_of_match[] = {
-	{ .compatible = "nintendo,starlet-hcd" },
+	{ .compatible = "nintendo,starlet-ios-hcd" },
 	{ },
 };
 

@@ -34,7 +34,7 @@
 #define DRV_DESCRIPTION  "Nintendo Wii starlet keyboard driver"
 #define DRV_AUTHOR       "Albert Herranz"
 
-static char stkbd_driver_version[] = "0.1i";
+static char stkbd_driver_version[] = "0.2i";
 
 #define drv_printk(level, format, arg...) \
 	 printk(level DRV_MODULE_NAME ": " format , ## arg)
@@ -470,7 +470,7 @@ static int __exit stkbd_of_remove(struct of_device *odev)
 }
 
 static struct of_device_id stkbd_of_match[] = {
-	{ .compatible = "nintendo,starlet-keyboard" },
+	{ .compatible = "nintendo,starlet-ios-keyboard" },
 	{ },
 };
 

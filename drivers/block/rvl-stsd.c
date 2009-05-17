@@ -51,7 +51,7 @@
 #define DRV_DESCRIPTION "Block driver for the Nintendo Wii SD front slot"
 #define DRV_AUTHOR      "Albert Herranz"
 
-static char stsd_driver_version[] = "0.3i";
+static char stsd_driver_version[] = "0.4i";
 
 #define drv_printk(level, format, arg...) \
 	printk(level DRV_MODULE_NAME ": " format , ## arg)
@@ -2246,7 +2246,7 @@ static int __exit stsd_of_remove(struct of_device *odev)
 }
 
 static struct of_device_id stsd_of_match[] = {
-	{ .compatible = "nintendo,starlet-sd" },
+	{ .compatible = "nintendo,starlet-ios-sd" },
 	{ },
 };
 
