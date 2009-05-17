@@ -112,9 +112,9 @@ config WII_MEM2
 	  To compile this driver as a module, choose M here: the
 	  module will be called rvl-mem2.
 
-	config WII_SD
+config WII_SD
 	tristate "Nintendo Wii front slot MMC/SD"
-	depends on WII
+	depends on STARLET_IOS
 	help
 	  This enables support for MMC/SD cards using the front SD card
 	  slot of the Nintendo Wii.

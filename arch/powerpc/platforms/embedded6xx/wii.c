@@ -30,15 +30,39 @@
 #include "gcnvi_udbg.h"
 #include "usbgecko_udbg.h"
 
+#ifdef CONFIG_STARLET_IOS
+
+static void wii_ios_restart(char *cmd)
+{
+	/* try first to launch The Homebrew Channel... */
+	starlet_es_reload_ios_and_launch(STARLET_TITLE_HBC);
+	/* ..and if that fails, try an assisted restart */
+	starlet_stm_restart();
+}
+
+static void wii_ios_power_off(void)
+{
+	/* try an assisted poweroff */
+	starlet_stm_power_off();
+}
+
+#else
+
+static void wii_ios_restart(char *cmd)
+{
+}
+
+static void wii_ios_power_off(void)
+{
+}
+
+#endif /* CONFIG_STARLET_IOS */
 
 static void wii_restart(char *cmd)
 {
 	local_irq_disable();
 
-	/* try first to launch The Homebrew Channel... */
-	starlet_es_reload_ios_and_launch(STARLET_TITLE_HBC);
-	/* ..and if that fails, try an assisted restart */
-	starlet_stm_restart();
+	wii_ios_restart(cmd);
 
 	/* fallback to spinning until the power button pressed */
 	for (;;)
@@ -49,8 +73,7 @@ static void wii_power_off(void)
 {
 	local_irq_disable();
 
-	/* try an assisted poweroff */
-	starlet_stm_power_off();
+	wii_ios_power_off();
 
 	/* fallback to spinning until the power button pressed */
 	for (;;)
@@ -154,11 +177,13 @@ static void wii_machine_kexec(struct kimage *image)
 {
 	local_irq_disable();
 
+#ifdef CONFIG_STARLET_IOS
 	/*
 	 * Reload IOS to make sure that I/O resources are freed before
 	 * the final kexec phase.
 	 */
 	starlet_es_reload_ios_and_discard();
+#endif
 
 	default_machine_kexec(image);
 }

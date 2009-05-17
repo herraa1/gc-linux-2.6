@@ -356,7 +356,7 @@ config USB_R8A66597_HCD
 
 config USB_WII_HCD
 	tristate "Nintendo Wii HCD support"
-	depends on USB && WII && !HIGHMEM && EXPERIMENTAL
+	depends on USB && STARLET_IOS && !HIGHMEM && EXPERIMENTAL
 	help
 	  The Nintendo Wii includes a USB 1.1 host controller that can be
 	  accessed through the API provided by the starlet subsystem.

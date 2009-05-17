@@ -103,10 +103,15 @@ config WII
 	bool "Nintendo-Wii"
 	depends on EMBEDDED6xx
 	select GAMECUBE_COMMON
-	select PPC_LIB_RHEAP
+	select PPC_LIB_RHEAP if STARLET_IOS
 	help
 	  Select WII if configuring for the Nintendo Wii.
 	  More information at: <http://gc-linux.sourceforge.net/>
+
+config STARLET_IOS
+	bool "Nintendo Wii Starlet IOS support"
+	depends on WII
+	default y
 
 config FLIPPER_PIC
 	bool
