@@ -187,6 +187,12 @@
 				interrupts = <0e>;
 				interrupt-parent = <&PIC0>;
 			};
+			sdhci@0d070000 {
+				compatible = "nintendo,hollywood-sdhci";
+				reg = <0d070000 200>;
+				interrupts = <07>;
+				interrupt-parent = <&PIC1>;
+			};
 		};
 
 		gpio0: starlet-gpio@0d8000c0 {
