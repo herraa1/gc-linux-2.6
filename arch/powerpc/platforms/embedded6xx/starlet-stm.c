@@ -16,7 +16,7 @@
 
 #include <linux/kernel.h>
 #include <linux/dma-mapping.h>
-#include <asm/starlet.h>
+#include <asm/starlet-ios.h>
 
 
 /*

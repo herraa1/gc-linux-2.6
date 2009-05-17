@@ -32,7 +32,7 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 #include <asm/time.h>
-#include <asm/starlet.h>
+#include <asm/starlet-ios.h>
 
 
 #define DRV_MODULE_NAME		"starlet-ipc"

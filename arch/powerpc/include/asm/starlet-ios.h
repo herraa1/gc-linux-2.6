@@ -1,7 +1,7 @@
 /*
- * arch/powerpc/include/asm/starlet.h
+ * arch/powerpc/include/asm/starlet-ios.h
  *
- * Nintendo Wii starlet processor definitions
+ * Nintendo Wii Starlet IOS definitions
  * Copyright (C) 2008-2009 The GameCube Linux Team
  * Copyright (C) 2008,2009 Albert Herranz
  *
@@ -12,8 +12,8 @@
  *
  */
 
-#ifndef __ASM_POWERPC_STARLET_H
-#define __ASM_POWERPC_STARLET_H
+#ifndef __STARLET_IOS_H
+#define __STARLET_IOS_H
 
 #include <linux/types.h>
 #include <linux/spinlock_types.h>
@@ -249,4 +249,4 @@ extern int starlet_es_reload_ios_and_launch(u64 title);
 extern void starlet_stm_restart(void);
 extern void starlet_stm_power_off(void);
 
-#endif /* __ASM_POWERPC_STARLET_H */
+#endif /* __STARLET_IOS_H */

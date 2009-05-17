@@ -23,7 +23,7 @@
 #include <asm/machdep.h>
 #include <asm/prom.h>
 #include <asm/time.h>
-#include <asm/starlet.h>
+#include <asm/starlet-ios.h>
 #include <asm/udbg.h>
 
 #include "flipper-pic.h"

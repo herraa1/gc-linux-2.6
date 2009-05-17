@@ -34,7 +34,7 @@
 
 #include <linux/kernel.h>
 #include <linux/resource.h>
-#include <asm/starlet.h>
+#include <asm/starlet-ios.h>
 
 
 #define LIB_MODULE_NAME		"starlet-malloc"

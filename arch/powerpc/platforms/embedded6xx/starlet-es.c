@@ -17,7 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/of_platform.h>
 #include <linux/scatterlist.h>
-#include <asm/starlet.h>
+#include <asm/starlet-ios.h>
 
 #define DRV_MODULE_NAME		"starlet-es"
 #define DRV_DESCRIPTION		"Nintendo Wii starlet ES driver"

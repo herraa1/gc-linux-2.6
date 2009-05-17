@@ -34,7 +34,7 @@
 #include <linux/of_platform.h>
 #include <linux/scatterlist.h>
 #include <linux/usb.h>
-#include <asm/starlet.h>
+#include <asm/starlet-ios.h>
 
 #include "../core/hcd.h"
 #include "../core/hub.h"

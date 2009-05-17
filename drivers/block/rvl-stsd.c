@@ -34,7 +34,7 @@
 #include <linux/major.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
-#include <asm/starlet.h>
+#include <asm/starlet-ios.h>
 
 /*
  * We are not a native MMC driver...

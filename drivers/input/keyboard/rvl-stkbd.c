@@ -28,7 +28,7 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
-#include <asm/starlet.h>
+#include <asm/starlet-ios.h>
 
 #define DRV_MODULE_NAME  "rvl-stkbd"
 #define DRV_DESCRIPTION  "Nintendo Wii starlet keyboard driver"
