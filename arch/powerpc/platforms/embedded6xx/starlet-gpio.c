@@ -18,6 +18,12 @@
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
 
+#define DRV_MODULE_NAME "starlet-gpio"
+
+#define drv_printk(level, format, arg...) \
+	printk(level DRV_MODULE_NAME ": " format , ## arg)
+
+
 struct stgpio_chip {
 	struct of_mm_gpio_chip mmchip;
 	spinlock_t lock;
@@ -97,6 +103,7 @@ int stgpio_add32(struct device_node *np)
 	struct gpio_chip *gc;
 	struct stgpio_chip *st_gc;
 	const unsigned long *prop;
+	int error;
 
 	st_gc = kzalloc(sizeof(*st_gc), GFP_KERNEL);
 	if (!st_gc)
@@ -119,7 +126,11 @@ int stgpio_add32(struct device_node *np)
 	gc->get = stgpio_get;
 	gc->set = stgpio_set;
 
-	return of_mm_gpiochip_add(np, mm_gc);
+	error = of_mm_gpiochip_add(np, mm_gc);
+	if (!error)
+		drv_printk(KERN_INFO, "%s: added %u gpios at %p\n",
+			   np->name, gc->ngpio, mm_gc->regs);
+	return error;
 }
 
 static int stgpio_init(void)
@@ -130,8 +141,8 @@ static int stgpio_init(void)
 	for_each_compatible_node(np, NULL, "nintendo,starlet-gpio") {
 		error = stgpio_add32(np);
 		if (error < 0)
-			printk(KERN_ERR "starlet-gpio: error %d adding gpios"
-					" for %s\n", error, np->full_name);
+			drv_printk(KERN_ERR, "error %d adding gpios"
+				   " for %s\n", error, np->full_name);
 	}
 	return 0; /* whatever */
 }
