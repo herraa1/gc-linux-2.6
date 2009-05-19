@@ -105,6 +105,7 @@ config WII
 	select GAMECUBE_COMMON
 	select PPC_LIB_RHEAP if STARLET_IOS
 	select USB_ARCH_HAS_EHCI if STARLET_MINI
+	select USB_ARCH_HAS_OHCI if STARLET_MINI
 	help
 	  Select WII if configuring for the Nintendo Wii.
 	  More information at: <http://gc-linux.sourceforge.net/>
