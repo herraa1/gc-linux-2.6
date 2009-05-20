@@ -187,6 +187,12 @@
 				interrupts = <0e>;
 				interrupt-parent = <&PIC0>;
 			};
+			ehci@0d040000 {
+				compatible = "nintendo,hollywood-ehci";
+				reg = <0d040000 100>;
+				interrupts = <04>;
+				interrupt-parent = <&PIC1>;
+			};
 			sdhci@0d070000 {
 				compatible = "nintendo,hollywood-sdhci";
 				reg = <0d070000 200>;
