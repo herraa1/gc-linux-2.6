@@ -113,6 +113,11 @@ config STARLET_IOS
 	depends on WII
 	default y
 
+config STARLET_MINI
+	bool "Team Twiizers 'mini' firmware support"
+	depends on WII && EXPERIMENTAL
+	default y
+
 config FLIPPER_PIC
 	bool
 	default n

@@ -23,6 +23,9 @@ static struct of_device_id wii_of_bus[] = {
 #ifdef CONFIG_STARLET_IOS
 	{ .compatible = "nintendo,starlet-ios-ipc", },
 #endif
+#ifdef CONFIG_STARLET_MINI
+	{ .compatible = "twiizers,starlet-mini-ipc", },
+#endif
 	{ },
 };
 

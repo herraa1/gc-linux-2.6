@@ -32,6 +32,7 @@
 #include <asm/io.h>
 #include <asm/bitops.h>
 #include <asm/time.h>
+#include <asm/starlet.h>
 #include <asm/starlet-ios.h>
 
 
@@ -1477,6 +1478,9 @@ static int starlet_ipc_do_probe(struct device *dev, struct resource *mem,
 {
 	struct starlet_ipc_device *ipc_dev;
 	int retval;
+
+	if (starlet_get_ipc_flavour() != STARLET_IPC_IOS)
+		return -ENODEV;
 
 	ipc_dev = kzalloc(sizeof(*ipc_dev), GFP_KERNEL);
 	if (!ipc_dev) {

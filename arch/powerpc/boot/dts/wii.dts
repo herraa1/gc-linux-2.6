@@ -80,6 +80,7 @@
 		clock-frequency = <e7be2c0>; /* 243MHz */
 		ranges = <0c000000 0c000000 00010000
 			  0d000000 0d000000 00010000
+			  0d040000 0d040000 00050000
 			  0d800000 0d800000 00001000
 			  133e0000 133e0000 00020000>;
 
@@ -162,6 +163,21 @@
 			starlet-ios-keyboard {
 				compatible = "nintendo,starlet-ios-keyboard";
 			};
+		};
+
+		/*
+		 * Hardware accessible through Team Twiizers 'mini' firmware
+		 * replacement for Starlet.
+		 */
+		starlet-mini-ipc@0d000000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			#interrupt-cells = <1>;
+			compatible = "twiizers,starlet-mini-ipc";
+			reg = <0d000000 40>;
+
+			ranges = <0d040000 0d040000 00050000
+				  0d800000 0d800000 00001000>;
 		};
 
 		gpio0: starlet-gpio@0d8000c0 {

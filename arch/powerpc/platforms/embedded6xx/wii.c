@@ -18,71 +18,125 @@
 #include <linux/seq_file.h>
 #include <linux/kexec.h>
 #include <linux/exi.h>
+#include <linux/gpio.h>
 
 #include <asm/io.h>
 #include <asm/machdep.h>
 #include <asm/prom.h>
 #include <asm/time.h>
+#include <asm/starlet.h>
 #include <asm/starlet-ios.h>
+#include <asm/starlet-mini.h>
 #include <asm/udbg.h>
 
 #include "flipper-pic.h"
 #include "gcnvi_udbg.h"
 #include "usbgecko_udbg.h"
 
+
+static enum starlet_ipc_flavour starlet_ipc_flavour;
+
+static void wii_death_loop(void)
+{
+	local_irq_disable();
+	for (;;)
+		cpu_relax();
+}
+
 #ifdef CONFIG_STARLET_IOS
 
 static void wii_ios_restart(char *cmd)
 {
+	local_irq_disable();
+
 	/* try first to launch The Homebrew Channel... */
 	starlet_es_reload_ios_and_launch(STARLET_TITLE_HBC);
 	/* ..and if that fails, try an assisted restart */
 	starlet_stm_restart();
+
+	/* fallback to spinning until the power button pressed */
+	for (;;)
+		cpu_relax();
 }
 
 static void wii_ios_power_off(void)
 {
+	local_irq_disable();
+
 	/* try an assisted poweroff */
 	starlet_stm_power_off();
+
+	/* fallback to spinning until the power button pressed */
+	for (;;)
+		cpu_relax();
 }
 
 #else
 
 static void wii_ios_restart(char *cmd)
 {
+	wii_death_loop();
 }
 
 static void wii_ios_power_off(void)
 {
+	wii_death_loop();
 }
 
 #endif /* CONFIG_STARLET_IOS */
 
-static void wii_restart(char *cmd)
+#ifdef CONFIG_STARLET_MINI
+
+static void wii_mipc_restart(char *cmd)
 {
+	void __iomem *hw_resets = (void __iomem *)0x0d800194;
+
 	local_irq_disable();
 
-	wii_ios_restart(cmd);
+	/* clear the system reset pin to cause a reset */
+	mipc_clear_bit(0, hw_resets);
+	mipc_wmb();
 
-	/* fallback to spinning until the power button pressed */
 	for (;;)
 		cpu_relax();
 }
 
-static void wii_power_off(void)
+static void wii_mipc_power_off(void)
 {
+	void __iomem *gpio = (void __iomem *)0x0d8000e0;
+
 	local_irq_disable();
 
-	wii_ios_power_off();
+	/* make sure that the poweroff GPIO is configured as an output */
+	mipc_out_be32(gpio + 4, mipc_in_be32(gpio + 4) | 0x2);
 
-	/* fallback to spinning until the power button pressed */
+	/* drive the poweroff GPIO high */
+	mipc_out_be32(gpio + 0, mipc_in_be32(gpio + 0) | 0x2);
+	mipc_wmb();
+
 	for (;;)
 		cpu_relax();
 }
+
+#else
+
+static void wii_mipc_restart(char *cmd)
+{
+	wii_death_loop();
+}
+
+static void wii_mipc_power_off(void)
+{
+	wii_death_loop();
+}
+
+#endif /* CONFIG_STARLET_MINI */
 
 static void wii_halt(void)
 {
-	wii_restart(NULL);
+	if (ppc_md.restart)
+		ppc_md.restart(NULL);
+	wii_death_loop();
 }
 
 static void wii_show_cpuinfo(struct seq_file *m)
@@ -91,10 +145,36 @@ static void wii_show_cpuinfo(struct seq_file *m)
 	seq_printf(m, "machine\t\t: Nintendo Wii\n");
 }
 
+int starlet_discover_ipc_flavour(void)
+{
+	struct mipc_infohdr *hdrp;
+	int error;
+
+	error = mipc_discover(&hdrp);
+	if (!error) {
+		starlet_ipc_flavour = STARLET_IPC_MINI;
+		ppc_md.restart = wii_mipc_restart;
+		ppc_md.power_off = wii_mipc_power_off;
+	} else {
+		starlet_ipc_flavour = STARLET_IPC_IOS;
+		ppc_md.restart = wii_ios_restart;
+		ppc_md.power_off = wii_ios_power_off;
+	}
+
+	return 0;
+}
+
+enum starlet_ipc_flavour starlet_get_ipc_flavour(void)
+{
+	return starlet_ipc_flavour;
+}
+
 static void __init wii_setup_arch(void)
 {
 	ug_udbg_init();
 	gcnvi_udbg_init();
+
+	starlet_discover_ipc_flavour();
 }
 
 static void __init wii_init_early(void)
@@ -182,7 +262,8 @@ static void wii_machine_kexec(struct kimage *image)
 	 * Reload IOS to make sure that I/O resources are freed before
 	 * the final kexec phase.
 	 */
-	starlet_es_reload_ios_and_discard();
+	if (starlet_get_ipc_flavour() == STARLET_IPC_IOS)
+		starlet_es_reload_ios_and_discard();
 #endif
 
 	default_machine_kexec(image);
@@ -197,8 +278,6 @@ define_machine(wii) {
 	.setup_arch		= wii_setup_arch,
 	.init_early		= wii_init_early,
 	.show_cpuinfo		= wii_show_cpuinfo,
-	.restart		= wii_restart,
-	.power_off		= wii_power_off,
 	.halt			= wii_halt,
 	.init_IRQ		= flipper_pic_probe,
 	.get_irq		= flipper_pic_get_irq,

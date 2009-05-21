@@ -10,6 +10,7 @@ obj-$(CONFIG_PPC_C2K)		+= c2k.o
 obj-$(CONFIG_GAMECUBE)		+= gamecube.o gamecube_dev.o
 obj-$(CONFIG_WII)		+= wii.o wii_dev.o
 obj-$(CONFIG_WII_GPIO)		+= starlet-gpio.o
+obj-$(CONFIG_STARLET_MINI)	+= starlet-mipc.o
 obj-$(CONFIG_STARLET_IOS)	+= starlet-ipc.o starlet-malloc.o \
 					starlet-stm.o starlet-es.o
 obj-$(CONFIG_FLIPPER_PIC)	+= flipper-pic.o
