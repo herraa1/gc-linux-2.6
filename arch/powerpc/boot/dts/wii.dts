@@ -32,7 +32,7 @@
 		/* bootargs = "nobats root=/dev/nfs nfsroot=192.168.001.253:/nfsroot/cube ip=on video=gcnfb:tv=NTSC force_keyboard_port=4"; */
 
 		/* root filesystem on 2nd partition of SD card, whiite style  */
-		bootargs = "nobats root=/dev/rvlsda2 video=gcnfb force_keyboard_port=4 placeholder_for_additional_kernel_options_targetted_at_hexedit_lovers";
+		bootargs = "nobats root=/dev/mmcblk0p2 rootwait video=gcnfb force_keyboard_port=4 placeholder_for_additional_kernel_options_targetted_at_hexedit_lovers";
 		linux,stdout-path = &USBGECKO0;
 	};
 
