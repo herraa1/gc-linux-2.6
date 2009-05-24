@@ -61,6 +61,7 @@
 #define _MIPC_NAND_STATUS 0x0005
 
 #define _MIPC_SDHC_DISCOVER 0x0000
+#define _MIPC_SDHC_EXIT	    0x0001
 
 #define _MIPC_SDMMC_ACK   0x0000
 #define _MIPC_SDMMC_READ  0x0001

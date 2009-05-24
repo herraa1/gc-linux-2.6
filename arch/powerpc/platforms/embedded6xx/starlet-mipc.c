@@ -62,6 +62,7 @@ static char mipc_driver_version[] = "0.2i";
 #define MIPC_INITIAL_TAG	1
 
 #define MIPC_SYS_IO_TIMEOUT	(250*1000)	/* usecs */
+#define MIPC_DEV_TIMEOUT	(10*1000*1000)	/* usecs */
 
 
 /*
@@ -748,6 +749,20 @@ static void mipc_simple_tests(struct mipc_device *ipc_dev)
 		   t_mipc_ping, tbl_to_ns(t_mipc_ping));
 }
 
+static void mipc_shutdown_mini_devs(struct mipc_device *ipc_dev)
+{
+	struct mipc_req resp;
+	int error;
+
+	error = mipc_sendrecv1_call(ipc_dev, MIPC_DEV_TIMEOUT, &resp,
+				    _MIPC(_MIPC_SLOW, _MIPC_DEV_SDHC,
+					   _MIPC_SDHC_EXIT), 0);
+	if (error) {
+		drv_printk(KERN_ERR, "unable to shutdown mini SDHC subsystem"
+			   ", you are DOOMED!\n");
+	}
+}
+
 static int mipc_init(struct mipc_device *ipc_dev, struct resource *mem, int irq)
 {
 	struct mipc_infohdr *hdr;
@@ -797,6 +812,8 @@ static int mipc_init(struct mipc_device *ipc_dev, struct resource *mem, int irq)
 
 	if (mipc_do_simple_tests)
 		mipc_simple_tests(ipc_dev);
+
+	mipc_shutdown_mini_devs(ipc_dev);
 
 out:
 	return error;
