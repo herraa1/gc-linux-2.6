@@ -763,6 +763,20 @@ static void mipc_shutdown_mini_devs(struct mipc_device *ipc_dev)
 	}
 }
 
+static void mipc_starlet_fixups(struct mipc_device *ipc_dev)
+{
+	void *gpio = (void *)0x0d8000c0;
+
+	/*
+	 * Try to turn off the front led and sensor bar.
+	 * (not strictly starlet-only stuff but anyway...)
+	 */
+	mipc_clearbitl(0x120, gpio);
+
+	/* tell 'mini' to relinquish control of hardware */
+	mipc_shutdown_mini_devs(ipc_dev);
+}
+
 static int mipc_init(struct mipc_device *ipc_dev, struct resource *mem, int irq)
 {
 	struct mipc_infohdr *hdr;
@@ -813,7 +827,7 @@ static int mipc_init(struct mipc_device *ipc_dev, struct resource *mem, int irq)
 	if (mipc_do_simple_tests)
 		mipc_simple_tests(ipc_dev);
 
-	mipc_shutdown_mini_devs(ipc_dev);
+	mipc_starlet_fixups(ipc_dev);
 
 out:
 	return error;
