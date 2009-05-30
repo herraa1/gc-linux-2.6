@@ -31,17 +31,100 @@
 
 #include <asm/prom.h>
 #include <asm/starlet.h>
+#include <asm/time.h>	/* for get_tbl() */
 
 #define DRV_MODULE_NAME "ohci-mipc"
 #define DRV_DESCRIPTION "USB Open Host Controller Interface for MINI"
 #define DRV_AUTHOR      "Albert Herranz"
 
-#define HOLLYWOOD_EHCI_CTL 0x0d0400cc
-#define HOLLYWOOD_EHCI_CTL_OH0INTE	(1<<11)
-#define HOLLYWOOD_EHCI_CTL_OH1INTE	(1<<12)
+#define HOLLYWOOD_EHCI_CTL 0x0d0400cc	/* vendor control register */
+#define HOLLYWOOD_EHCI_CTL_OH0INTE	(1<<11)	/* oh0 interrupt enable */
+#define HOLLYWOOD_EHCI_CTL_OH1INTE	(1<<12)	/* oh1 interrupt enable */
 
-static int __devinit
-ohci_mipc_start(struct usb_hcd *hcd)
+
+static DEFINE_SPINLOCK(quirk_lock);
+
+#define __spin_event_timeout(condition, timeout_usecs, result, __end_tbl) \
+        for (__end_tbl = get_tbl() + tb_ticks_per_usec * timeout_usecs; \
+             !(result = (condition)) && (int)(__end_tbl - get_tbl()) > 0;)
+
+void ohci_mipc_control_quirk(struct ohci_hcd *ohci)
+{
+	static struct ed *ed; /* empty ED */
+	struct td *td; /* dummy TD */
+	__hc32 head;
+	__hc32 current;
+	unsigned long ctx;
+	int result;
+	unsigned long flags;
+
+	/*
+	 * One time only.
+	 * Allocate and keep a special empty ED with just a dummy TD.
+	 */
+	if (!ed) {
+		ed = ed_alloc(ohci, GFP_ATOMIC);
+		if (!ed)
+			return;
+
+		td = td_alloc(ohci, GFP_ATOMIC);
+		if (!td) {
+			ed_free(ohci, ed);
+			ed = NULL;
+			return;
+		}
+
+		ed->hwNextED = 0;
+		ed->hwTailP = ed->hwHeadP = cpu_to_hc32(ohci,
+							td->td_dma & ED_MASK);
+		ed->hwINFO |= cpu_to_hc32(ohci, ED_OUT);
+		wmb();
+	}
+
+	spin_lock_irqsave(&quirk_lock, flags);
+
+	/*
+	 * The OHCI USB host controllers on the Nintendo Wii
+	 * video game console stop working when new TDs are
+	 * added to a scheduled control ED after a transfer has
+	 * has taken place on it.
+	 *
+	 * Before scheduling any new control TD, we make the
+	 * controller happy by always loading a special control ED
+	 * with a single dummy TD and letting the controller attempt
+	 * the transfer.
+	 * The controller won't do anything with it, as the special
+	 * ED has no TDs, but it will keep the controller from failing
+	 * on the next transfer.
+	 */
+	head = ohci_readl(ohci, &ohci->regs->ed_controlhead);
+	if (head) {
+		/*
+		 * Load the special empty ED and tell the controller to
+		 * process the control list.
+		 */
+		ohci_writel(ohci, ed->dma, &ohci->regs->ed_controlhead);
+		ohci_writel (ohci, ohci->hc_control | OHCI_CTRL_CLE,
+			     &ohci->regs->control);
+		ohci_writel (ohci, OHCI_CLF, &ohci->regs->cmdstatus);
+
+		/* spin until the controller is done with the control list  */
+		current = ohci_readl(ohci, &ohci->regs->ed_controlcurrent);
+		__spin_event_timeout(!current, 10 /* usecs */, result, ctx) {
+			cpu_relax();
+			current = ohci_readl(ohci,
+					     &ohci->regs->ed_controlcurrent);
+		}
+
+		/* restore the old control head and control settings */
+		ohci_writel (ohci, ohci->hc_control, &ohci->regs->control);
+		ohci_writel(ohci, head, &ohci->regs->ed_controlhead);
+	}
+
+	spin_unlock_irqrestore(&quirk_lock, flags);
+}
+
+static int __devinit ohci_mipc_start(struct usb_hcd *hcd)
 {
 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
 	void *ehci_ctl = (void *)HOLLYWOOD_EHCI_CTL;
@@ -151,6 +234,8 @@ ohci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 	hcd->regs = (void __iomem *)(unsigned long)hcd->rsrc_start;
 
 	ohci = hcd_to_ohci(hcd);
+	ohci->flags |= OHCI_QUIRK_WII;
+
 	ohci_hcd_init(ohci);
 
 	error = usb_add_hcd(hcd, irq, IRQF_DISABLED);

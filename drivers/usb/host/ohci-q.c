@@ -649,6 +649,9 @@ static void td_submit_urb (
 	 * any DATA phase works normally, and the STATUS ack is special.
 	 */
 	case PIPE_CONTROL:
+		if (ohci->flags & OHCI_QUIRK_WII)
+			ohci_mipc_control_quirk(ohci);
+
 		info = TD_CC | TD_DP_SETUP | TD_T_DATA0;
 		td_fill (ohci, info, urb->setup_dma, 8, urb, cnt++);
 		if (data_len > 0) {
