@@ -141,7 +141,7 @@
 		/*
 		 * Firmware interfaces accessible through Nintendo IOS IPC.
 		 */
-		starlet-ios-ipc@0d000000 {
+		ios@0d000000 {
 			compatible = "nintendo,starlet-ios-ipc";
 			reg = <0d000000 40	/* IPC */
 			       133e0000 20000>;	/* MEM2 ioh 128K */
@@ -169,7 +169,7 @@
 		 * Hardware accessible through Team Twiizers 'mini' firmware
 		 * replacement for Starlet.
 		 */
-		starlet-mini-ipc@0d000000 {
+		mini@0d000000 {
 			#address-cells = <1>;
 			#size-cells = <1>;
 			#interrupt-cells = <1>;
@@ -193,19 +193,19 @@
 				interrupts = <04>;
 				interrupt-parent = <&PIC1>;
 			};
-			ohci1@0d050000 {
+			ohci0@0d050000 {
 				compatible = "nintendo,hollywood-ohci";
 				reg = <0d050000 100>;
 				interrupts = <05>;
 				interrupt-parent = <&PIC1>;
 			};
-			ohci0@0d060000 {
+			ohci1@0d060000 {
 				compatible = "nintendo,hollywood-ohci";
 				reg = <0d060000 100>;
 				interrupts = <06>;
 				interrupt-parent = <&PIC1>;
 			};
-			sdhci@0d070000 {
+			sdhc0@0d070000 {
 				compatible = "nintendo,hollywood-sdhci";
 				reg = <0d070000 200>;
 				interrupts = <07>;
