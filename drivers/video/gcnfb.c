@@ -1797,6 +1797,13 @@ static int vifb_set_par(struct fb_info *info)
 	/* horizontal line in bytes */
 	info->fix.line_length = var->xres_virtual * (var->bits_per_pixel / 8);
 
+	ctl->page_address[0] = info->fix.smem_start;
+	if (var->yres * info->fix.line_length <= info->fix.smem_len / 2)
+		ctl->page_address[1] =
+		    info->fix.smem_start + var->yres * info->fix.line_length;
+	else
+		ctl->page_address[1] = info->fix.smem_start;
+
 	/* set page 0 as the visible page and cancel pending flips */
 	spin_lock_irqsave(&ctl->lock, flags);
 	ctl->visible_page = 1;
@@ -1812,13 +1819,6 @@ static int vifb_set_par(struct fb_info *info)
 		info->fix.xpanstep = 0;
 		info->fix.ypanstep = 0;
 	}
-
-	ctl->page_address[0] = info->fix.smem_start;
-	if (var->yres * info->fix.line_length <= info->fix.smem_len / 2)
-		ctl->page_address[1] =
-		    info->fix.smem_start + var->yres * info->fix.line_length;
-	else
-		ctl->page_address[1] = info->fix.smem_start;
 
 	vi_setup_tv_mode(ctl);
 
