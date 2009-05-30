@@ -688,7 +688,7 @@ static void mipc_print_infohdr(struct mipc_infohdr *hdr)
 		   hdr->ipc_out_size, (void *)hdr->ipc_out);
 }
 
-static int mipc_do_simple_tests = 1;
+static int mipc_do_simple_tests = 0;
 
 #ifndef MODULE
 static int __init mipc_simple_tests_setup(char *str)
