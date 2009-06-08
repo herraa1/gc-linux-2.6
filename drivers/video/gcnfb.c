@@ -39,7 +39,7 @@
 			  "Todd Jeffreys <todd@voidpointer.org>, " \
 			  "Albert Herranz"
 
-static char vifb_driver_version[] = "2.0i";
+static char vifb_driver_version[] = "2.1i";
 
 #define drv_printk(level, format, arg...) \
 	 printk(level DRV_MODULE_NAME ": " format , ## arg)
@@ -522,6 +522,9 @@ static struct fb_var_screeninfo vifb_var = {
  * Setup parameters.
  */
 static int want_ypan = 1;		/* 0..nothing, 1..ypan */
+
+/* use old behaviour for video mode settings */
+static int nostalgic;
 
 static int force_scan;
 static int force_rate;
@@ -1655,7 +1658,11 @@ static int vifb_check_var_timings(struct fb_var_screeninfo *var,
 	struct vi_ctl *ctl = info->par;
 	struct vi_tv_mode *mode = ctl->mode;
 	struct vi_mode_timings timings;
+	u32 yres = var->yres;
 	int error = -EINVAL;
+
+	if (nostalgic && yres == 576)
+		yres = 574;
 
 	if (vi_vmode_is_progressive(var->vmode)) {
 		/* 480p */
@@ -1665,7 +1672,7 @@ static int vifb_check_var_timings(struct fb_var_screeninfo *var,
 		if (mode->lines == 625)
 			/* 576i */
 			error = vi_pal_625_calc_timings(&timings, var,
-							var->xres, var->yres);
+							var->xres, yres);
 		else
 			/* 480i */
 			error = vi_ntsc_525_calc_timings(&timings, var,
@@ -1707,8 +1714,12 @@ static int vifb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	if (yres & VI_VERT_ALIGN)
 		yres = _ALIGN_UP(yres, VI_VERT_ALIGN+1);
 	if (yres > mode->height) {
-		drv_printk(KERN_ERR, "yres %u out of bounds\n", yres);
-		goto err_out;
+		if (!nostalgic) {
+			drv_printk(KERN_ERR, "yres %u out of bounds\n", yres);
+			goto err_out;
+		}
+		if (!(mode->height == 574 && yres == 576))
+			yres = mode->height;
 	}
 	if (yres < 16) {
 		/* XXX, fbcon will happily page fault for yres < 13 */
@@ -1990,12 +2001,17 @@ static int __devinit vifb_do_probe(struct device *dev,
 	vi_reset_video(ctl);
 	vi_detect_tv_mode(ctl);
 
-	/* by default, start with overscan compensation */
-	info->var.xres = 576;
-	if (ctl->mode->height == 574)
-		info->var.yres = 516;
-	else
-		info->var.yres = 432;
+	if (!nostalgic) {
+		/* by default, start with overscan compensation */
+		info->var.xres = 576;
+		if (ctl->mode->height == 574)
+			info->var.yres = 516;
+		else
+			info->var.yres = 432;
+	} else {
+		info->var.xres = ctl->mode->width;
+		info->var.yres = ctl->mode->height;
+	}
 
 	ctl->visible_page = 0;
 	ctl->flip_pending = 0;
@@ -2134,7 +2150,8 @@ static int __devinit vifb_setup(char *options)
 				force_tv = VI_TV_PAL;
 			else if (!strncmp(this_opt + 3, "NTSC", 4))
 				force_tv = VI_TV_NTSC;
-		}
+		} else if (!strcmp(this_opt, "nostalgic"))
+			nostalgic = 1;
 	}
 
 	if (force_scan == VI_SCAN_PROGRESSIVE || force_tv == VI_TV_NTSC) {
