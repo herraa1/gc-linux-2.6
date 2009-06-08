@@ -34,6 +34,7 @@
 #include <linux/of_platform.h>
 #include <linux/scatterlist.h>
 #include <linux/usb.h>
+#include <asm/starlet.h>
 #include <asm/starlet-ios.h>
 
 #include "../core/hcd.h"
@@ -2262,6 +2263,9 @@ static int __devinit sthcd_driver_probe(struct device *dev)
 	struct sthcd_hcd *sthcd;
 	struct usb_hcd *hcd;
 	int error = -ENOMEM;
+
+	if (starlet_get_ipc_flavour() != STARLET_IPC_IOS)
+		return -ENODEV;
 
 	/*
 	 * We can't use normal dma as starlet requires MEM2 buffers
