@@ -585,10 +585,16 @@ static inline void _ohci_writel(const struct ohci_hcd *ohci,
 }
 
 extern void ohci_mipc_control_quirk(struct ohci_hcd *ohci);
+extern void ohci_mipc_bulk_quirk(struct ohci_hcd *ohci);
 
 #else
 
 static inline void ohci_mipc_control_quirk(struct ohci_hcd *ohci)
+{
+	return;
+}
+
+static inline void ohci_mipc_bulk_quirk(struct ohci_hcd *ohci)
 {
 	return;
 }

@@ -618,6 +618,9 @@ static void td_submit_urb (
 			&& ohci_to_hcd(ohci)->self.bandwidth_isoc_reqs == 0;
 		/* FALLTHROUGH */
 	case PIPE_BULK:
+		if (ohci->flags & OHCI_QUIRK_WII)
+			ohci_mipc_bulk_quirk(ohci);
+
 		info = is_out
 			? TD_T_TOGGLE | TD_CC | TD_DP_OUT
 			: TD_T_TOGGLE | TD_CC | TD_DP_IN;

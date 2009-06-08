@@ -41,12 +41,12 @@
 #define HOLLYWOOD_EHCI_CTL_OH0INTE	(1<<11)	/* oh0 interrupt enable */
 #define HOLLYWOOD_EHCI_CTL_OH1INTE	(1<<12)	/* oh1 interrupt enable */
 
-
-static DEFINE_SPINLOCK(quirk_lock);
-
 #define __spin_event_timeout(condition, timeout_usecs, result, __end_tbl) \
         for (__end_tbl = get_tbl() + tb_ticks_per_usec * timeout_usecs; \
              !(result = (condition)) && (int)(__end_tbl - get_tbl()) > 0;)
+
+
+static DEFINE_SPINLOCK(control_quirk_lock);
 
 void ohci_mipc_control_quirk(struct ohci_hcd *ohci)
 {
@@ -81,7 +81,7 @@ void ohci_mipc_control_quirk(struct ohci_hcd *ohci)
 		wmb();
 	}
 
-	spin_lock_irqsave(&quirk_lock, flags);
+	spin_lock_irqsave(&control_quirk_lock, flags);
 
 	/*
 	 * The OHCI USB host controllers on the Nintendo Wii
@@ -121,7 +121,22 @@ void ohci_mipc_control_quirk(struct ohci_hcd *ohci)
 		ohci_writel(ohci, head, &ohci->regs->ed_controlhead);
 	}
 
-	spin_unlock_irqrestore(&quirk_lock, flags);
+	spin_unlock_irqrestore(&control_quirk_lock, flags);
+}
+
+void ohci_mipc_bulk_quirk(struct ohci_hcd *ohci)
+{
+	/*
+	 * There seem to be issues too with the bulk list processing on the
+	 * OHCI controller found in the Nintendo Wii video game console.
+	 * The exact problem remains still unidentified, but adding a small
+	 * delay seems to workaround it.
+	 *
+	 * As an example, without this quirk the wiimote controller stops
+	 * responding after a few seconds because one of its bulk endpoint
+	 * descriptors gets stuck.
+	 */
+	udelay(250);
 }
 
 static int __devinit ohci_mipc_start(struct usb_hcd *hcd)
