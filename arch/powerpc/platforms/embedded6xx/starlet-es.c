@@ -17,6 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/of_platform.h>
 #include <linux/scatterlist.h>
+#include <asm/starlet.h>
 #include <asm/starlet-ios.h>
 
 #define DRV_MODULE_NAME		"starlet-es"
@@ -584,6 +585,9 @@ static int starlet_es_do_probe(struct device *dev)
 {
 	struct starlet_es_device *es_dev;
 	int retval;
+
+	if (starlet_get_ipc_flavour() != STARLET_IPC_IOS)
+		return -ENODEV;
 
 	es_dev = kzalloc(sizeof(*es_dev), GFP_KERNEL);
 	if (!es_dev) {
