@@ -197,13 +197,15 @@
 			};
 			ohci0@0d050000 {
 				compatible = "nintendo,hollywood-ohci";
-				reg = <0d050000 100>;
+				reg = <0d050000 100
+				       13460000 80000>; /* 512 KB */
 				interrupts = <05>;
 				interrupt-parent = <&PIC1>;
 			};
 			ohci1@0d060000 {
 				compatible = "nintendo,hollywood-ohci";
-				reg = <0d060000 100>;
+				reg = <0d060000 100
+				       134e0000 80000>; /* 512 KB */
 				interrupts = <06>;
 				interrupt-parent = <&PIC1>;
 			};

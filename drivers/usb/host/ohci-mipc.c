@@ -215,14 +215,16 @@ ohci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 	struct usb_hcd *hcd;
 	struct ohci_hcd	*ohci = NULL;
 	struct resource res;
+	dma_addr_t coherent_mem_addr;
+	size_t coherent_mem_size;
 	int irq;
-	int error;
+	int error = -ENODEV;
 
 	if (usb_disabled())
-		return -ENODEV;
+		goto out;
 
 	if (starlet_get_ipc_flavour() != STARLET_IPC_MINI)
-		return -ENODEV;
+		goto out;
 
 	dev_dbg(&op->dev, "initializing " DRV_MODULE_NAME " USB Controller\n");
 
@@ -238,6 +240,26 @@ ohci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 
 	hcd->rsrc_start = res.start;
 	hcd->rsrc_len = res.end - res.start + 1;
+
+	error = of_address_to_resource(dn, 1, &res);
+	if (error) {
+		/* satisfy coherent memory allocations from mem1 or mem2 */
+		dev_warn(&op->dev, "using normal memory\n");
+	} else {
+		coherent_mem_addr = res.start;
+		coherent_mem_size = res.end - res.start + 1;
+		if (!dma_declare_coherent_memory(&op->dev, coherent_mem_addr,
+						 coherent_mem_addr,
+						 coherent_mem_size,
+						 DMA_MEMORY_MAP |
+						 DMA_MEMORY_EXCLUSIVE)) {
+			dev_err(&op->dev, "error declaring %u bytes of"
+				" coherent memory at 0x%p\n",
+				coherent_mem_size, (void *)coherent_mem_addr);
+			error = -EBUSY;
+			goto err_decl_coherent;
+		}
+	}
 
 	irq = irq_of_parse_and_map(dn, 0);
 	if (irq == NO_IRQ) {
@@ -262,6 +284,8 @@ ohci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 err_add_hcd:
 	irq_dispose_mapping(irq);
 err_irq:
+	dma_release_declared_memory(&op->dev);
+err_decl_coherent:
 	usb_put_hcd(hcd);
 out:
 	return error;
@@ -277,6 +301,7 @@ static int ohci_hcd_mipc_remove(struct of_device *op)
 
 	usb_remove_hcd(hcd);
 	irq_dispose_mapping(hcd->irq);
+	dma_release_declared_memory(&op->dev);
 	usb_put_hcd(hcd);
 
 	return 0;
