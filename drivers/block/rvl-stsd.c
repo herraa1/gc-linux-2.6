@@ -34,6 +34,7 @@
 #include <linux/major.h>
 #include <linux/module.h>
 #include <linux/of_platform.h>
+#include <asm/starlet.h>
 #include <asm/starlet-ios.h>
 
 /*
@@ -2197,6 +2198,9 @@ static int __devinit stsd_do_probe(struct device *dev)
 {
 	struct stsd_host *host;
 	int error;
+
+	if (starlet_get_ipc_flavour() != STARLET_IPC_IOS)
+		return -ENODEV;
 
 	host = kzalloc(sizeof(*host), GFP_KERNEL);
 	if (!host) {
