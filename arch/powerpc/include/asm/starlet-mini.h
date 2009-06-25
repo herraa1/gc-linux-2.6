@@ -155,6 +155,9 @@ extern void mipc_clrsetbits_be32(const volatile u32 __iomem *addr,
 
 extern void mipc_wmb(void);
 
+extern void __iomem *mipc_ioremap(phys_addr_t addr, unsigned long size);
+extern void mipc_iounmap(volatile void __iomem *addr);
+
 #else
 
 struct mipc_infohdr;

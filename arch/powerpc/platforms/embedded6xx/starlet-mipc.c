@@ -31,7 +31,7 @@
 #define DRV_DESCRIPTION		"IPC driver for 'mini'"
 #define DRV_AUTHOR		"Albert Herranz"
 
-static char mipc_driver_version[] = "0.2i";
+static char mipc_driver_version[] = "0.3i";
 
 #define drv_printk(level, format, arg...) \
 	printk(level DRV_MODULE_NAME ": " format , ## arg)
@@ -83,6 +83,22 @@ struct mipc_req {
 } __attribute__ ((packed));
 
 
+struct mipc_ops {
+	unsigned int (*readl)(void __iomem *addr);
+	unsigned short (*readw)(void __iomem *addr);
+	unsigned char (*readb)(void __iomem *addr);
+	void (*writel)(unsigned int val, void __iomem *addr);
+	void (*writew)(unsigned short val, void __iomem *addr);
+	void (*writeb)(unsigned char val, void __iomem *addr);
+	void (*setbitl)(unsigned int val, void __iomem *addr);
+	void (*clearbitl)(unsigned int val, void __iomem *addr);
+	void (*clrsetbitsl)(unsigned int clear, unsigned int set,
+			    void __iomem *addr);
+	void (*_wmb)(void);
+	void __iomem *(*ioremap)(phys_addr_t addr, unsigned long size);
+	void (*iounmap)(volatile void __iomem *addr);
+};
+
 /*
  *
  */
@@ -91,6 +107,8 @@ struct mipc_device {
 	int irq;
 
 	struct device *dev;
+	struct mipc_ops *ops;
+
 	spinlock_t call_lock;	/* serialize firmware calls */
 	spinlock_t io_lock;	/* serialize access to io registers */
 
@@ -345,7 +363,6 @@ static int mipc_sendrecv_call(struct mipc_device *ipc_dev,
 	unsigned long flags;
 	int error;
 
-	BUG_ON(!ipc_dev);
 	spin_lock_irqsave(&ipc_dev->call_lock, flags);
 	req->tag = ipc_dev->tag++;
 	error = mipc_send_req(ipc_dev, timeout, req);
@@ -360,12 +377,12 @@ out:
 
 static int mipc_sendrecv1_call(struct mipc_device *ipc_dev,
 			       unsigned long timeout,
-			       struct mipc_req *resp, u32 code, void *baddr)
+			       struct mipc_req *resp, u32 code, u32 arg)
 {
 	struct mipc_req req;
 
 	__mipc_fill_req(&req, code);
-	req.args[0] = (u32)baddr;
+	req.args[0] = arg;
 	return mipc_sendrecv_call(ipc_dev, timeout, &req, resp);
 }
 
@@ -376,7 +393,6 @@ static int mipc_send_call(struct mipc_device *ipc_dev, unsigned long timeout,
 	unsigned long flags;
 	int error;
 
-	BUG_ON(!ipc_dev);
 	spin_lock_irqsave(&ipc_dev->call_lock, flags);
 	req->tag = ipc_dev->tag++;
 	error = mipc_send_req(ipc_dev, timeout, req);
@@ -386,25 +402,25 @@ static int mipc_send_call(struct mipc_device *ipc_dev, unsigned long timeout,
 }
 
 static int mipc_send2_call(struct mipc_device *ipc_dev, unsigned long timeout,
-			   u32 code, void *baddr, u32 val)
+			   u32 code, u32 arg1, u32 arg2)
 {
 	struct mipc_req req;
 
 	__mipc_fill_req(&req, code);
-	req.args[0] = (u32)baddr;
-	req.args[1] = val;
+	req.args[0] = arg1;
+	req.args[1] = arg2;
 	return mipc_send_call(ipc_dev, timeout, &req);
 }
 
 static int mipc_send3_call(struct mipc_device *ipc_dev, unsigned long timeout,
-			   u32 code, void *baddr, u32 a, u32 b)
+			   u32 code, u32 arg1, u32 arg2, u32 arg3)
 {
 	struct mipc_req req;
 
 	__mipc_fill_req(&req, code);
-	req.args[0] = (u32)baddr;
-	req.args[1] = a;
-	req.args[2] = b;
+	req.args[0] = arg1;
+	req.args[1] = arg2;
+	req.args[2] = arg3;
 	return mipc_send_call(ipc_dev, timeout, &req);
 }
 
@@ -464,66 +480,244 @@ static int mipc_ping(struct mipc_device *ipc_dev, unsigned long timeout)
 	return error;
 }
 
-#define __declare_ipc_send2_call(_name, _suffix, _size, _call) \
-void mipc_##_name##_suffix(_size a, void __iomem *baddr) \
+
+/*
+ *
+ * Indirect I/O operations.
+ *
+ */
+
+#define __declare_ipc_send2_accessor(_name, _suffix, _size, _call) \
+void mipc_indirect_##_name##_suffix(_size a, void __iomem *addr) \
 {									\
 	struct mipc_device *ipc_dev = mipc_get_device();		\
 	int error;							\
 									\
 	error = mipc_send2_call(ipc_dev, MIPC_SYS_IO_TIMEOUT, _call,	\
-				baddr, a);				\
+				(u32)addr, a);				\
 	if (!error)							\
 		return;							\
 									\
-	DBG(__stringify(_name, _suffix) "(%p,%x)\n", baddr, a);		\
+	DBG(__stringify(_name, _suffix) "(%p,%x)\n", addr, a);		\
 	BUG();								\
 }
 
-#define __declare_ipc_send3_call(_name, _suffix, _size, _call) \
-void mipc_##_name##_suffix(_size a, _size b, void __iomem *baddr) \
+#define __declare_ipc_send3_accessor(_name, _suffix, _size, _call) \
+void mipc_indirect_##_name##_suffix(_size a, _size b, void __iomem *addr) \
 {									\
 	struct mipc_device *ipc_dev = mipc_get_device();		\
 	int error;							\
 									\
 	error = mipc_send3_call(ipc_dev, MIPC_SYS_IO_TIMEOUT, _call,	\
-				baddr, a, b);				\
+				(u32)addr, a, b);				\
 	if (!error)							\
 		return;							\
 									\
-	DBG(__stringify(_name, _suffix) "(%p,%x,%x)\n", baddr, a, b);	\
+	DBG(__stringify(_name, _suffix) "(%p,%x,%x)\n", addr, a, b);	\
 	BUG();								\
 }
 
-#define __declare_ipc_sendrecv1_call(_name, _suffix, _size, _call) \
-_size mipc_##_name##_suffix(void __iomem *baddr) \
+#define __declare_ipc_sendrecv1_accessor(_name, _suffix, _size, _call) \
+_size mipc_indirect_##_name##_suffix(void __iomem *addr) \
 {									\
 	struct mipc_device *ipc_dev = mipc_get_device();		\
 	struct mipc_req resp;						\
 	int error;							\
 									\
 	error = mipc_sendrecv1_call(ipc_dev, MIPC_SYS_IO_TIMEOUT,	\
-				    &resp, _call, baddr);		\
+				    &resp, _call, (u32)addr);		\
 	if (!error)							\
 		return resp.args[0];					\
 									\
-	DBG(__stringify(_name, _suffix) "(%p)\n", baddr);		\
+	DBG(__stringify(_name, _suffix) "(%p)\n", addr);		\
 	BUG();								\
 	return 0;							\
 }
 
+__declare_ipc_sendrecv1_accessor(read, l, unsigned int, MIPC_SYS_READ32)
+__declare_ipc_sendrecv1_accessor(read, w, unsigned short, MIPC_SYS_READ16)
+__declare_ipc_sendrecv1_accessor(read, b, unsigned char, MIPC_SYS_READ8)
 
-__declare_ipc_send2_call(write, l, unsigned int, MIPC_SYS_WRITE32)
-__declare_ipc_send2_call(write, w, unsigned short, MIPC_SYS_WRITE16)
-__declare_ipc_send2_call(write, b, unsigned char, MIPC_SYS_WRITE8)
-__declare_ipc_send2_call(setbit, l, unsigned int, MIPC_SYS_SET32)
-__declare_ipc_send2_call(clearbit, l, unsigned int, MIPC_SYS_CLEAR32)
+__declare_ipc_send2_accessor(write, l, unsigned int, MIPC_SYS_WRITE32)
+__declare_ipc_send2_accessor(write, w, unsigned short, MIPC_SYS_WRITE16)
+__declare_ipc_send2_accessor(write, b, unsigned char, MIPC_SYS_WRITE8)
 
-__declare_ipc_send3_call(clrsetbits, l, unsigned int, MIPC_SYS_MASK32)
+__declare_ipc_send2_accessor(setbit, l, unsigned int, MIPC_SYS_SET32)
+__declare_ipc_send2_accessor(clearbit, l, unsigned int, MIPC_SYS_CLEAR32)
+__declare_ipc_send3_accessor(clrsetbits, l, unsigned int, MIPC_SYS_MASK32)
 
-__declare_ipc_sendrecv1_call(read, l, unsigned int, MIPC_SYS_READ32)
-__declare_ipc_sendrecv1_call(read, w, unsigned short, MIPC_SYS_READ16)
-__declare_ipc_sendrecv1_call(read, b, unsigned char, MIPC_SYS_READ8)
+void mipc_indirect_wmb(void)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	int error;
 
+	error = mipc_ping(ipc_dev, MIPC_SYS_IO_TIMEOUT);
+	if (!error)
+		return;
+
+	DBG(__stringify(_name, _suffix) "()\n");
+	BUG();
+}
+
+void __iomem *mipc_indirect_ioremap(phys_addr_t addr, unsigned long size)
+{
+	return (void __iomem *)addr;
+}
+
+void mipc_indirect_iounmap(volatile void __iomem *addr)
+{
+	/* nothing to do */
+}
+
+/*
+ *
+ * Direct I/O operations.
+ *
+ */
+
+void mipc_direct_writel(unsigned int val, void __iomem *addr)
+{
+	out_be32(addr, val);
+}
+
+void mipc_direct_writew(unsigned short val, void __iomem *addr)
+{
+	out_be16(addr, val);
+}
+
+void mipc_direct_writeb(unsigned char val, void __iomem *addr)
+{
+	out_8(addr, val);
+}
+
+void mipc_direct_setbitl(unsigned int val, void __iomem *addr)
+{
+	out_be32(addr, in_be32(addr) | val);
+}
+
+void mipc_direct_clearbitl(unsigned int val, void __iomem *addr)
+{
+	out_be32(addr, in_be32(addr) & ~val);
+}
+
+void mipc_direct_clrsetbitsl(unsigned int clear, unsigned int set,
+			     void __iomem *addr)
+{
+	out_be32(addr, (in_be32(addr) & ~clear) | set);
+}
+
+unsigned int mipc_direct_readl(void __iomem *addr)
+{
+	return in_be32(addr);
+}
+
+unsigned short mipc_direct_readw(void __iomem *addr)
+{
+	return in_be16(addr);
+}
+
+unsigned char mipc_direct_readb(void __iomem *addr)
+{
+	return in_8(addr);
+}
+
+void mipc_direct_wmb(void)
+{
+	wmb();
+}
+
+void __iomem *mipc_direct_ioremap(phys_addr_t addr, unsigned long size)
+{
+	return ioremap(addr, size);
+}
+
+void mipc_direct_iounmap(volatile void __iomem *addr)
+{
+	iounmap(addr);
+}
+
+
+/*
+ *
+ *
+ */
+
+unsigned int mipc_readl(void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	return ipc_dev->ops->readl(addr);
+}
+
+unsigned short mipc_readw(void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	return ipc_dev->ops->readw(addr);
+}
+
+unsigned char mipc_readb(void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	return ipc_dev->ops->readb(addr);
+}
+
+void mipc_writel(unsigned int val, void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	ipc_dev->ops->writel(val, addr);
+}
+
+void mipc_writew(unsigned short val, void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	ipc_dev->ops->writew(val, addr);
+}
+
+void mipc_writeb(unsigned char val, void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	ipc_dev->ops->writeb(val, addr);
+}
+
+void mipc_setbitl(unsigned int val, void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	ipc_dev->ops->setbitl(val, addr);
+}
+
+void mipc_clearbitl(unsigned int val, void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	ipc_dev->ops->clearbitl(val, addr);
+}
+
+void mipc_clrsetbitsl(unsigned int clear, unsigned int set, void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	ipc_dev->ops->clrsetbitsl(clear, set, addr);
+}
+
+void mipc_wmb(void)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	ipc_dev->ops->_wmb();
+}
+
+void __iomem *mipc_ioremap(phys_addr_t addr, unsigned long size)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	return ipc_dev->ops->ioremap(addr, size);
+}
+
+void mipc_iounmap(volatile void __iomem *addr)
+{
+	struct mipc_device *ipc_dev = mipc_get_device();
+	ipc_dev->ops->iounmap(addr);
+}
+
+/*
+ *
+ *
+ */
 
 #define BITOP_MASK(nr)          (1UL << ((nr) % BITS_PER_LONG))
 #define BITOP_WORD(nr)          ((nr) / BITS_PER_LONG)
@@ -577,20 +771,6 @@ u8 mipc_in_8(const volatile u8 __iomem *addr)
 void mipc_out_8(const volatile u8 __iomem *addr, u8 val)
 {
 	mipc_writeb(val, (void __iomem *)addr);
-}
-
-void mipc_wmb(void)
-{
-	struct mipc_device *ipc_dev = mipc_get_device();
-	int error;
-
-	BUG_ON(!ipc_dev);
-	error = mipc_ping(ipc_dev, MIPC_SYS_IO_TIMEOUT);
-	if (!error)
-		return;
-
-	DBG(__stringify(_name, _suffix) "()\n");
-	BUG();
 }
 
 
@@ -709,12 +889,18 @@ static unsigned long tbl_to_ns(unsigned long tbl)
 static void mipc_simple_tests(struct mipc_device *ipc_dev)
 {
 	void __iomem *io_base = ipc_dev->io_base;
-	void *gpio = (void *)0x0d8000c0;
+	void *gpio;
 	unsigned long t0;
 	unsigned long t_read, t_write;
 	unsigned long t_mipc_read, t_mipc_write, t_mipc_ping;
 	u32 val;
 	int i;
+
+	gpio = mipc_ioremap(0x0d8000c0, 4);
+	if (!gpio) {
+		DBG("ioremap failed\n");
+		return;
+	}
 
 	for (i = 0; i < 64000; i++) {
 		t0 = get_tbl();
@@ -740,13 +926,15 @@ static void mipc_simple_tests(struct mipc_device *ipc_dev)
 
 	drv_printk(KERN_INFO, "io timings in timebase ticks"
 		   " (1 usec = %lu ticks)\n", tb_ticks_per_usec);
-	drv_printk(KERN_CONT, "iomem: read=%lu (%lu ns), write=%lu (%lu ns)\n",
+	drv_printk(KERN_CONT, "mmio: read=%lu (%lu ns), write=%lu (%lu ns)\n",
 		   t_read, tbl_to_ns(t_read), t_write, tbl_to_ns(t_write));
-	drv_printk(KERN_CONT, "mipc : read=%lu (%lu ns), write=%lu (%lu ns),"
-		   " ping=%lu (%lu ns)\n",
+	drv_printk(KERN_CONT, "mipc: read=%lu (%lu ns), write=%lu (%lu ns)\n",
 		   t_mipc_read, tbl_to_ns(t_mipc_read),
-		   t_mipc_write, tbl_to_ns(t_mipc_write),
+		   t_mipc_write, tbl_to_ns(t_mipc_write));
+	drv_printk(KERN_CONT, "mipc: ping=%lu (%lu ns)\n",
 		   t_mipc_ping, tbl_to_ns(t_mipc_ping));
+
+	mipc_iounmap(gpio);
 }
 
 static void mipc_shutdown_mini_devs(struct mipc_device *ipc_dev)
@@ -765,16 +953,74 @@ static void mipc_shutdown_mini_devs(struct mipc_device *ipc_dev)
 
 static void mipc_starlet_fixups(struct mipc_device *ipc_dev)
 {
-	void *gpio = (void *)0x0d8000c0;
+	void __iomem *gpio;
 
 	/*
 	 * Try to turn off the front led and sensor bar.
 	 * (not strictly starlet-only stuff but anyway...)
 	 */
-	mipc_clearbitl(0x120, gpio);
+	gpio = mipc_ioremap(0x0d8000c0, 4);
+	if (gpio) {
+		mipc_clearbitl(0x120, gpio);
+		mipc_iounmap(gpio);
+	}
 
 	/* tell 'mini' to relinquish control of hardware */
 	mipc_shutdown_mini_devs(ipc_dev);
+}
+
+struct mipc_ops mipc_indirect_ops = {
+	.readl = mipc_indirect_readl,
+	.readw = mipc_indirect_readw,
+	.readb = mipc_indirect_readb,
+	.writel = mipc_indirect_writel,
+	.writew = mipc_indirect_writew,
+	.writeb = mipc_indirect_writeb,
+	.setbitl = mipc_indirect_setbitl,
+	.clearbitl = mipc_indirect_clearbitl,
+	.clrsetbitsl = mipc_indirect_clrsetbitsl,
+	._wmb = mipc_indirect_wmb,
+	.ioremap = mipc_indirect_ioremap,
+	.iounmap = mipc_indirect_iounmap,
+};
+
+struct mipc_ops mipc_direct_ops = {
+	.readl = mipc_direct_readl,
+	.readw = mipc_direct_readw,
+	.readb = mipc_direct_readb,
+	.writel = mipc_direct_writel,
+	.writew = mipc_direct_writew,
+	.writeb = mipc_direct_writeb,
+	.setbitl = mipc_direct_setbitl,
+	.clearbitl = mipc_direct_clearbitl,
+	.clrsetbitsl = mipc_direct_clrsetbitsl,
+	._wmb = mipc_direct_wmb,
+	.ioremap = mipc_direct_ioremap,
+	.iounmap = mipc_direct_iounmap,
+};
+
+static void mipc_init_ops(struct mipc_device *ipc_dev)
+{
+	void __iomem *hw_ahbprot = (void __iomem *)0x0d800064;
+	u32 initial_ahbprot, ahbprot;
+
+	initial_ahbprot = mipc_indirect_readl(hw_ahbprot);
+	if (initial_ahbprot != 0xffffffff) {
+		drv_printk(KERN_INFO, "AHBPROT=%08X (before)\n",
+			   initial_ahbprot);
+		mipc_indirect_writel(0xffffffff, hw_ahbprot);
+	}
+
+	ahbprot = mipc_indirect_readl(hw_ahbprot);
+	if (initial_ahbprot != ahbprot)
+		drv_printk(KERN_INFO, "AHBPROT=%08X (after)\n", ahbprot);
+	if (ahbprot != 0xffffffff) {
+		drv_printk(KERN_INFO, "using indirect io via mini\n");
+		ipc_dev->ops = &mipc_indirect_ops;
+	} else {
+		drv_printk(KERN_INFO, "using direct io\n");
+		ipc_dev->ops = &mipc_direct_ops;
+	}
 }
 
 static int mipc_init(struct mipc_device *ipc_dev, struct resource *mem, int irq)
@@ -824,6 +1070,7 @@ static int mipc_init(struct mipc_device *ipc_dev, struct resource *mem, int irq)
 
 	drv_printk(KERN_INFO, "ping OK\n");
 
+	mipc_init_ops(ipc_dev);
 	if (mipc_do_simple_tests)
 		mipc_simple_tests(ipc_dev);
 

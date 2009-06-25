@@ -182,7 +182,11 @@ struct irq_host *hollywood_pic_init(struct device_node *np)
 		drv_printk(KERN_ERR, "no io memory range found\n");
 		return NULL;
 	}
-	io_base = (void __iomem *)res.start;
+	io_base = mipc_ioremap(res.start, resource_size(&res));
+	if (!io_base) {
+		drv_printk(KERN_ERR, "ioremap failed\n");
+		return NULL;
+	}
 
 	drv_printk(KERN_INFO, "controller at 0x%p\n", io_base);
 

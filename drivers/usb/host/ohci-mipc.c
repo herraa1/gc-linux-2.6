@@ -142,17 +142,26 @@ void ohci_mipc_bulk_quirk(struct ohci_hcd *ohci)
 static int __devinit ohci_mipc_start(struct usb_hcd *hcd)
 {
 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-	void *ehci_ctl = (void *)HOLLYWOOD_EHCI_CTL;
+	void __iomem *ehci_ctl;
 	int error;
 
 	error = ohci_init(ohci);
 	if (error)
 		goto out;
 
+	ehci_ctl = mipc_ioremap(HOLLYWOOD_EHCI_CTL, 4);
+	if (!ehci_ctl) {
+		printk(KERN_ERR __FILE__ ": ioremap failed\n");
+		error = -EBUSY;
+		ohci_stop(hcd);
+		goto out;
+	}
+
 	/* enable notification of OHCI interrupts */
 	mipc_out_be32(ehci_ctl, mipc_in_be32(ehci_ctl) | 0xe0000 |
 						HOLLYWOOD_EHCI_CTL_OH0INTE |
 						HOLLYWOOD_EHCI_CTL_OH1INTE);
+	mipc_iounmap(ehci_ctl);
 
 	error = ohci_run(ohci);
 	if (error) {
@@ -239,7 +248,7 @@ ohci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 	}
 
 	hcd->rsrc_start = res.start;
-	hcd->rsrc_len = res.end - res.start + 1;
+	hcd->rsrc_len = resource_size(&res);
 
 	error = of_address_to_resource(dn, 1, &res);
 	if (error) {
@@ -268,7 +277,12 @@ ohci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 		goto err_irq;
 	}
 
-	hcd->regs = (void __iomem *)(unsigned long)hcd->rsrc_start;
+	hcd->regs = mipc_ioremap(hcd->rsrc_start, hcd->rsrc_len);
+	if (!hcd->regs) {
+		printk(KERN_ERR __FILE__ ": ioremap failed\n");
+		error = -EBUSY;
+		goto err_ioremap;
+	}
 
 	ohci = hcd_to_ohci(hcd);
 	ohci->flags |= OHCI_QUIRK_WII;
@@ -282,6 +296,8 @@ ohci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 	return 0;
 
 err_add_hcd:
+	mipc_iounmap(hcd->regs);
+err_ioremap:
 	irq_dispose_mapping(irq);
 err_irq:
 	dma_release_declared_memory(&op->dev);
@@ -300,6 +316,7 @@ static int ohci_hcd_mipc_remove(struct of_device *op)
 	dev_dbg(&op->dev, "stopping " DRV_MODULE_NAME " USB Controller\n");
 
 	usb_remove_hcd(hcd);
+	mipc_iounmap(hcd->regs);
 	irq_dispose_mapping(hcd->irq);
 	dma_release_declared_memory(&op->dev);
 	usb_put_hcd(hcd);

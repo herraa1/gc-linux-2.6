@@ -43,23 +43,33 @@
 static int ehci_mipc_reset(struct usb_hcd *hcd)
 {
 	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
-	void __iomem *ehci_ctl = (void __iomem *)HOLLYWOOD_EHCI_CTL;
-	int		retval;
+	void __iomem *ehci_ctl;
+	int error;
 
-	retval = ehci_halt(ehci);
-	if (retval)
-		return retval;
+	error = ehci_halt(ehci);
+	if (error)
+		goto out;
 
-	retval = ehci_init(hcd);
-	if (retval)
-		return retval;
+	error = ehci_init(hcd);
+	if (error)
+		goto out;
+
+	ehci_ctl = mipc_ioremap(HOLLYWOOD_EHCI_CTL, 4);
+	if (!ehci_ctl) {
+		printk(KERN_ERR __FILE__ ": ioremap failed\n");
+		error = -EBUSY;
+		goto out;
+	}
 
 	/* enable notification of EHCI interrupts */
 	mipc_out_be32(ehci_ctl, mipc_in_be32(ehci_ctl) |
 						HOLLYWOOD_EHCI_CTL_INTE);
+	mipc_iounmap(ehci_ctl);
 
 	ehci->sbrn = 0x20;
-	return ehci_reset(ehci);
+	error = ehci_reset(ehci);
+out:
+	return error;
 }
 
 static const struct hc_driver ehci_mipc_hc_driver = {
@@ -138,7 +148,7 @@ ehci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 	}
 
 	hcd->rsrc_start = res.start;
-	hcd->rsrc_len = res.end - res.start + 1;
+	hcd->rsrc_len = resource_size(&res);
 
 	error = of_address_to_resource(dn, 1, &res);
 	if (error) {
@@ -167,7 +177,12 @@ ehci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 		goto err_irq;
 	}
 
-	hcd->regs = (void __iomem *)(unsigned long)hcd->rsrc_start;
+	hcd->regs = mipc_ioremap(hcd->rsrc_start, hcd->rsrc_len);
+	if (!hcd->regs) {
+		printk(KERN_ERR __FILE__ ": ioremap failed\n");
+		error = -EBUSY;
+		goto err_ioremap;
+	}
 
 	ehci = hcd_to_ehci(hcd);
 	ehci->caps = hcd->regs;
@@ -181,6 +196,8 @@ ehci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 	if (error == 0)
 		return 0;
 
+	mipc_iounmap(hcd->regs);
+err_ioremap:
 	irq_dispose_mapping(irq);
 err_irq:
 	dma_release_declared_memory(&op->dev);
@@ -200,6 +217,7 @@ static int ehci_hcd_mipc_remove(struct of_device *op)
 	dev_dbg(&op->dev, "stopping " DRV_MODULE_NAME " USB Controller\n");
 
 	usb_remove_hcd(hcd);
+	mipc_iounmap(hcd->regs);
 	irq_dispose_mapping(hcd->irq);
 	dma_release_declared_memory(&op->dev);
 	usb_put_hcd(hcd);

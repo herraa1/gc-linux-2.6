@@ -70,7 +70,7 @@ static u8 sdhci_mipc_readb(struct sdhci_host *host, int reg)
 static void sdhci_mipc_writel(struct sdhci_host *host, u32 val, int reg)
 {
 	mipc_out_be32(host->ioaddr + reg, val);
-	mipc_wmb();
+	udelay(5);
 }
 
 static void sdhci_mipc_writew(struct sdhci_host *host, u16 val, int reg)
@@ -94,7 +94,7 @@ static void sdhci_mipc_writew(struct sdhci_host *host, u16 val, int reg)
 	}
 	mipc_clrsetbits_be32(host->ioaddr + base,
 			     0xffff << shift, val << shift);
-	mipc_wmb();
+	udelay(5);
 }
 
 static void sdhci_mipc_writeb(struct sdhci_host *host, u8 val, int reg)
@@ -103,7 +103,7 @@ static void sdhci_mipc_writeb(struct sdhci_host *host, u8 val, int reg)
 	int shift = (reg & 0x3) * 8;
 
 	mipc_clrsetbits_be32(host->ioaddr + base , 0xff << shift, val << shift);
-	mipc_wmb();
+	udelay(5);
 }
 
 static struct sdhci_mipc_data sdhci_mipc = {
@@ -178,7 +178,12 @@ static int __devinit sdhci_mipc_probe(struct of_device *ofdev,
 		goto err_no_address;
 	}
 
-	host->ioaddr = (void __iomem *)res.start;
+	host->ioaddr = mipc_ioremap(res.start, resource_size(&res));
+	if (!host->ioaddr) {
+		DBG("ioremap failed\n");
+		error = -EINVAL;
+		goto err_ioremap;
+	}
 
 	host->irq = irq_of_parse_and_map(np, 0);
 	if (!host->irq) {
@@ -204,6 +209,8 @@ static int __devinit sdhci_mipc_probe(struct of_device *ofdev,
 err_add_host:
 	irq_dispose_mapping(host->irq);
 err_no_irq:
+	mipc_iounmap(host->ioaddr);
+err_ioremap:
 err_no_address:
 	sdhci_free_host(host);
 out:
@@ -216,6 +223,7 @@ static int __devexit sdhci_mipc_remove(struct of_device *ofdev)
 
 	sdhci_remove_host(host, 0);
 	irq_dispose_mapping(host->irq);
+	mipc_iounmap(host->ioaddr);
 	sdhci_free_host(host);
 	return 0;
 }

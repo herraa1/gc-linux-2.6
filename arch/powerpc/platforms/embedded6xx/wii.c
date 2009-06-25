@@ -89,13 +89,17 @@ static void wii_ios_power_off(void)
 
 static void wii_mipc_restart(char *cmd)
 {
-	void __iomem *hw_resets = (void __iomem *)0x0d800194;
+	void __iomem *hw_resets;
 
 	local_irq_disable();
 
-	/* clear the system reset pin to cause a reset */
-	mipc_clear_bit(0, hw_resets);
-	mipc_wmb();
+	hw_resets = mipc_ioremap(0x0d800194, 4);
+	if (hw_resets) {
+		/* clear the system reset pin to cause a reset */
+		mipc_clear_bit(0, hw_resets);
+		mipc_wmb();
+		mipc_iounmap(hw_resets);
+	}
 
 	for (;;)
 		cpu_relax();
@@ -103,16 +107,20 @@ static void wii_mipc_restart(char *cmd)
 
 static void wii_mipc_power_off(void)
 {
-	void __iomem *gpio = (void __iomem *)0x0d8000e0;
+	void __iomem *gpio;
 
 	local_irq_disable();
 
-	/* make sure that the poweroff GPIO is configured as an output */
-	mipc_out_be32(gpio + 4, mipc_in_be32(gpio + 4) | 0x2);
+	gpio = mipc_ioremap(0x0d8000e0, 3*4);
+	if (gpio) {
+		/* make sure that the poweroff GPIO is configured as output */
+		mipc_out_be32(gpio + 4, mipc_in_be32(gpio + 4) | 0x2);
 
-	/* drive the poweroff GPIO high */
-	mipc_out_be32(gpio + 0, mipc_in_be32(gpio + 0) | 0x2);
-	mipc_wmb();
+		/* drive the poweroff GPIO high */
+		mipc_out_be32(gpio + 0, mipc_in_be32(gpio + 0) | 0x2);
+		mipc_wmb();
+		mipc_iounmap(gpio);
+	}
 
 	for (;;)
 		cpu_relax();
