@@ -111,6 +111,15 @@ _mmu_off: \n\
 	mtspr	0x21c, 8	/* DBAT2U */\n\
 	mtspr	0x21d, 9	/* DBAT2L */\n\
 \n\
+	lis	8, 0x1000	/* MEM2 */\n\
+	ori	8, 8, 0x07ff	/* 64MiB */\n\
+	lis	9, 0x1000\n\
+	ori	9, 9, 0x0002	/* rw */\n\
+	mtspr	0x216, 8	/* IBAT3U */\n\
+	mtspr	0x217, 9	/* IBAT3L */\n\
+	mtspr	0x21e, 8	/* DBAT3U */\n\
+	mtspr	0x21f, 9	/* DBAT3L */\n\
+\n\
 	sync\n\
 	isync\n\
 \n\
@@ -186,6 +195,107 @@ err_out:
 
 /*
  *
+ *
+ */
+
+struct mipc_infohdr {
+	char magic[3];
+	u8 version;
+	u32 mem2_boundary;
+	u32 ipc_in;
+	size_t ipc_in_size;
+	u32 ipc_out;
+	size_t ipc_out_size;
+};
+
+static int mipc_check_address(u32 pa)
+{
+	if (pa < 0x10000000 || pa > 0x14000000)
+		return -EINVAL;
+	return 0;
+}
+
+static void platform_fixups(void)
+{
+	struct mipc_infohdr **hdrp, *hdr;
+	u32 reg[4];
+	u32 mem2_boundary, top;
+	void *devp;
+
+	/*
+	 * The mini header pointer is specified in the second "reg" entry
+	 * of the starlet-mini-ipc node.
+	 */
+	devp = find_node_by_compatible(NULL, "twiizers,starlet-mini-ipc");
+	if (!devp) {
+		printf("unable to find %s node\n", "twiizers,starlet-mini-ipc");
+		goto err_out;
+	}
+	if (getprop(devp, "reg", &reg, sizeof(reg)) != sizeof(reg)) {
+		printf("unable to find %s property\n", "reg");
+		goto err_out;
+	}
+	hdrp = (struct mipc_infohdr **)reg[2];
+	if (mipc_check_address((u32)hdrp)) {
+		printf("mini: invalid hdrp %08X\n", (u32)hdrp);
+		goto err_out;
+	}
+
+	hdr = *hdrp;
+	if (mipc_check_address((u32)hdr)) {
+		printf("mini: invalid hdr %08X\n", (u32)hdr);
+		goto err_out;
+	}
+	if (memcmp(hdr->magic, "IPC", 3)) {
+		printf("mini: invalid magic, asuming ios\n");
+		goto err_out;
+	}
+	mem2_boundary = hdr->mem2_boundary;
+	if (mipc_check_address(mem2_boundary)) {
+		printf("mini: invalid mem2_boundary %08X\n", mem2_boundary);
+		goto err_out;
+	}
+
+	top = mem2_boundary;
+	printf("top of mem @ %08X (%s)\n", top, "current");
+
+	/* fixup local memory for EHCI controller */
+	devp = NULL;
+	while ((devp = find_node_by_compatible(devp,
+					       "nintendo,hollywood-ehci"))) {
+		if (getprop(devp, "reg", &reg, sizeof(reg)) == sizeof(reg)) {
+			top -= reg[3];
+			printf("ehci %08X -> %08X\n", reg[2], top);
+			reg[2] = top;
+			setprop(devp, "reg", &reg, sizeof(reg));
+		}
+	}
+
+	/* fixup local memory for OHCI controllers */
+	devp = NULL;
+	while ((devp = find_node_by_compatible(devp,
+					       "nintendo,hollywood-ohci"))) {
+		if (getprop(devp, "reg", &reg, sizeof(reg)) == sizeof(reg)) {
+			top -= reg[3];
+			printf("ohci %08X -> %08X\n", reg[2], top);
+			reg[2] = top;
+			setprop(devp, "reg", &reg, sizeof(reg));
+		}
+	}
+
+	/* fixup available memory */
+	dt_fixup_memory(0, top);
+
+	printf("top of mem @ %08X (%s)\n", top, "final");
+
+	return;
+
+err_out:
+	return;
+}
+
+/*
+ *
  */
 void platform_init(unsigned long r3, unsigned long r4, unsigned long r5)
 {
@@ -197,6 +307,7 @@ void platform_init(unsigned long r3, unsigned long r4, unsigned long r5)
 	if (!ug_grab_io_base() && ug_is_adapter_present())
 		console_ops.write = ug_console_write;
 
+	platform_ops.fixups = platform_fixups;
 	save_lowmem_stub();
 }
 

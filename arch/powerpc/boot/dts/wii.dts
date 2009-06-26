@@ -82,7 +82,7 @@
 			  0d000000 0d000000 00010000
 			  0d040000 0d040000 00050000
 			  0d800000 0d800000 00001000
-			  133e0000 133e0000 00b20000>;
+			  133e0000 133e0000 00c20000>;
 
 		video@0c002000 {
 			compatible = "nintendo,hollywood-video";
@@ -174,11 +174,12 @@
 			#size-cells = <1>;
 			#interrupt-cells = <1>;
 			compatible = "twiizers,starlet-mini-ipc";
-			reg = <0d000000 40>;
+			reg = <0d000000 40	/* IPC */
+			       13fffffc 4>;	/* mini header pointer */
 
 			ranges = <0d040000 0d040000 00050000
 				  0d800000 0d800000 00001000
-				  133e0000 133e0000 00b20000>;
+				  133e0000 133e0000 00c20000>;
 
 			PIC1: pic1@0d800030 {
 				#interrupt-cells = <1>;
