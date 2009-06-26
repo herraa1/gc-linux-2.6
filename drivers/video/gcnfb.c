@@ -1646,7 +1646,10 @@ static int vifb_pan_display(struct fb_var_screeninfo *var,
 	vi_set_framebuffer(ctl, info->fix.smem_start + offset);
 
 	spin_lock_irqsave(&ctl->lock, flags);
-	ctl->visible_page = (offset) ? 1 : 0;
+	if (info->fix.smem_start + offset >= ctl->page_address[1])
+		ctl->visible_page = 1;
+	else
+		ctl->visible_page = 0;
 	spin_unlock_irqrestore(&ctl->lock, flags);
 
 	return 0;
