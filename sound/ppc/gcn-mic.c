@@ -612,8 +612,8 @@ static int mic_init_snd(struct mic_device *dev)
 
 DBG("enter\n");
 
-	card = snd_card_new(index, id, THIS_MODULE, 0);
-	if (!card) {
+	retval = snd_card_create(index, id, THIS_MODULE, 0, &card);
+	if (retval < 0) {
 		mic_printk(KERN_ERR, "unable to create sound card\n");
 		goto err_card;
 	}
