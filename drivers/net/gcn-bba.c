@@ -1088,6 +1088,16 @@ static inline void bba_write(void *data, size_t len)
 	return exi_dev_write(priv->exi_device, data, len);
 }
 
+static const struct net_device_ops bba_netdev_ops = {
+	.ndo_open		= bba_open,
+	.ndo_stop		= bba_close,
+	.ndo_start_xmit		= bba_start_xmit,
+	.ndo_get_stats		= bba_get_stats,
+	.ndo_change_mtu		= eth_change_mtu,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address	= eth_mac_addr,
+};
+
 /*
  * Initializes a BroadBand Adapter device.
  */
@@ -1110,10 +1120,7 @@ static int __devinit bba_init_device(struct exi_device *exi_device)
 	dev->irq = 0;
 
 	/* network device hooks */
-	dev->open = bba_open;
-	dev->stop = bba_close;
-	dev->hard_start_xmit = bba_start_xmit;
-	dev->get_stats = bba_get_stats;
+	dev->netdev_ops = &bba_netdev_ops;
 
 	priv = netdev_priv(dev);
 	priv->dev = dev;
