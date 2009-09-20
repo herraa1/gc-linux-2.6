@@ -349,10 +349,12 @@ struct bba_descr {
 	__u32	status:8,
 		packet_len:12,
 		next_packet_ptr:12;
-#else
+#elif defined(__LITTLE_ENDIAN_BITFIELD)
 	__u32	next_packet_ptr:12,
 		packet_len:12,
 		status:8;
+#else
+#error "Unsupported byte order."
 #endif
 } __attribute((packed));
 
