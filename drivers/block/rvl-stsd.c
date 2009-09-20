@@ -1723,12 +1723,12 @@ static int stsd_do_block_transfer(struct stsd_host *host, int write,
 	return error;
 }
 
-/*
- * Returns >0 if a request should be dispatched.
- */
 static int stsd_check_request(struct stsd_host *host, struct request *req)
 {
 	unsigned long nr_sectors;
+
+	if (!blk_fs_request(req))
+		return -EIO;
 
 	if (test_bit(__STSD_MEDIA_CHANGED, &host->flags)) {
 		drv_printk(KERN_ERR, "media changed, aborting\n");
@@ -1741,15 +1741,12 @@ static int stsd_check_request(struct stsd_host *host, struct request *req)
 					KERNEL_SECTOR_SHIFT);
 
 	/* keep our reads within limits */
-	if (req->sector + req->current_nr_sectors > nr_sectors) {
+	if (blk_rq_pos(req) + blk_rq_cur_sectors(req) > nr_sectors) {
 		drv_printk(KERN_ERR, "reading past end, aborting\n");
 		return -EINVAL;
 	}
 
-	if (!blk_fs_request(req))
-		return 0;
-
-	return 1;
+	return 0;
 }
 
 static int stsd_do_request(struct stsd_host *host, struct request *req)
@@ -1757,19 +1754,18 @@ static int stsd_do_request(struct stsd_host *host, struct request *req)
 	unsigned long nr_blocks; /* in card blocks */
 	unsigned long start;
 	int write;
-	int uptodate;
 	int error;
 
-	uptodate = stsd_check_request(host, req);
-	if (uptodate <= 0)
-		return uptodate;
+	error = stsd_check_request(host, req);
+	if (error)
+		goto out;
 
 	write = (rq_data_dir(req) == READ) ? 0 : 1;
 
-	start = req->sector;
+	start = blk_rq_pos(req);
 	if (!stsd_card_is_sdhc(host))
 		start <<= KERNEL_SECTOR_SHIFT;
-	nr_blocks = req->current_nr_sectors;
+	nr_blocks = blk_rq_cur_sectors(req);
 
 	error = stsd_do_block_transfer(host, write,
 					start, req->buffer, nr_blocks);
@@ -1777,6 +1773,7 @@ static int stsd_do_request(struct stsd_host *host, struct request *req)
 		DBG("%s: error=%d (%08x), start=%lu, \n", __func__,
 		    error, error, start);
 
+out:
 	return error;
 }
 
@@ -1796,7 +1793,7 @@ static int stsd_io_thread(void *param)
 
 		spin_lock_irqsave(&host->queue_lock, flags);
 		if (!blk_queue_plugged(host->queue))
-			req = elv_next_request(host->queue);
+			req = blk_fetch_request(host->queue);
 		spin_unlock_irqrestore(&host->queue_lock, flags);
 
 		if (!req) {
@@ -1813,7 +1810,7 @@ static int stsd_io_thread(void *param)
 		error = stsd_do_request(host, req);
 
 		spin_lock_irqsave(&host->queue_lock, flags);
-		__blk_end_request(req, error, blk_rq_bytes(req));
+		__blk_end_request_cur(req, error);
 		spin_unlock_irqrestore(&host->queue_lock, flags);
 	}
 	mutex_unlock(&host->io_mutex);
@@ -1824,7 +1821,6 @@ static int stsd_io_thread(void *param)
 static void stsd_request_func(struct request_queue *q)
 {
 	struct stsd_host *host = q->queuedata;
-
 	wake_up_process(host->io_thread);
 }
 
@@ -1958,7 +1954,7 @@ static int stsd_revalidate_disk(struct gendisk *disk)
 	}
 
 	/* inform the block layer about various sizes */
-	blk_queue_hardsect_size(host->queue, KERNEL_SECTOR_SIZE);
+	blk_queue_logical_block_size(host->queue, KERNEL_SECTOR_SIZE);
 	set_capacity(host->disk, host->card.csd.capacity <<
 			 (host->card.csd.read_blkbits - KERNEL_SECTOR_SHIFT));
 
