@@ -231,7 +231,7 @@ xpedite52*)
     platformo=$object/cuboot-85xx.o
     ;;
 wii|gamecube)
-    link_address='0x500000'
+    link_address='0x600000'
     ;;
 esac
 
