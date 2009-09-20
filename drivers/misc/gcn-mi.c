@@ -211,7 +211,6 @@ static int mi_probe(struct device *device, struct resource *mem, int irq)
 	struct platform_device *pdev = to_platform_device(device);
 	priv->proc_file = create_proc_read_entry(pdev->dev.bus_id, 0444, NULL,
 						 mi_proc_read, priv);
-	priv->proc_file->owner = THIS_MODULE;
 	}
 #endif /* CONFIG_PROC_FS */
 
