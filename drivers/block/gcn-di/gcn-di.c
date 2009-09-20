@@ -1821,15 +1821,13 @@ static void di_request_done(struct di_command *cmd)
 	int error = (cmd->result & DI_SR_TCINT) ? 0 : -EIO;
 
 	spin_lock_irqsave(&ddev->lock, flags);
-
 	req = ddev->req;
 	ddev->req = NULL;
-
 	spin_unlock_irqrestore(&ddev->lock, flags);
 
 	if (req) {
-		__blk_end_request(req, error, req->current_nr_sectors << 9);
 		spin_lock_irqsave(&ddev->queue_lock, flags);
+		__blk_end_request_cur(req, error);
 		blk_start_queue(ddev->queue);
 		spin_unlock_irqrestore(&ddev->queue_lock, flags);
 	}
@@ -1843,32 +1841,12 @@ static void di_do_request(struct request_queue *q)
 	unsigned long start;
 	unsigned long flags;
 	size_t len;
+	int error;
 
-	while ((req = elv_next_request(q))) {
-		/* keep our reads within limits */
-		if (req->sector + req->current_nr_sectors > ddev->nr_sectors) {
-			drv_printk(KERN_ERR, "reading past end\n");
-			end_request(req, 0);
-			continue;
-		}
-
-		/* it doesn't make sense to write to this device */
-		if (rq_data_dir(req) == WRITE) {
-			drv_printk(KERN_ERR, "write attempted\n");
-			end_request(req, 0);
-			continue;
-		}
-
-		/* it is not a good idea to open the lid ... */
-		if ((ddev->flags & DI_MEDIA_CHANGED)) {
-			drv_printk(KERN_ERR, "media changed, aborting\n");
-			end_request(req, 0);
-			continue;
-		}
-
+	req = blk_peek_request(q);
+	while (req) {
 		spin_lock_irqsave(&ddev->lock, flags);
 
-		/* we can schedule just a single request each time */
 		if (ddev->req || ddev->cmd) {
 			blk_stop_queue(q);
 			if (ddev->cmd)
@@ -1877,29 +1855,49 @@ static void di_do_request(struct request_queue *q)
 			break;
 		}
 
-		blkdev_dequeue_request(req);
+		blk_start_request(req);
+		error = -EIO;
 
-		/* ignore requests that we can't handle */
-		if (!blk_fs_request(req)) {
-			spin_unlock_irqrestore(&ddev->lock, flags);
-			continue;
+		if (!blk_fs_request(req))
+			goto done;
+
+		/* it doesn't make sense to write to this device */
+		if (rq_data_dir(req) == WRITE) {
+			drv_printk(KERN_ERR, "write attempted\n");
+			goto done;
 		}
 
-		/* store the request being handled ... */
-		ddev->req = req;
-		blk_stop_queue(q);
+		/* it is not a good idea to open the lid ... */
+		if ((ddev->flags & DI_MEDIA_CHANGED)) {
+			drv_printk(KERN_ERR, "media changed, aborting\n");
+			goto done;
+		}
 
+		/* keep our reads within limits */
+		if (blk_rq_pos(req) +
+				 blk_rq_cur_sectors(req) > ddev->nr_sectors) {
+			drv_printk(KERN_ERR, "reading past end\n");
+			goto done;
+		}
+
+		ddev->req = req;
 		spin_unlock_irqrestore(&ddev->lock, flags);
 
-		/* ... and launch the corresponding read sector command */
-		start = req->sector << KERNEL_SECTOR_SHIFT;
-		len = req->current_nr_sectors << KERNEL_SECTOR_SHIFT;
+		/* launch the corresponding read sector command */
+		start = blk_rq_pos(req) << KERNEL_SECTOR_SHIFT;
+		len = blk_rq_cur_bytes(req);
 
 		di_op_readsector(cmd, ddev, start >> 2,
 				 req->buffer, len);
 		cmd->done_data = cmd;
 		cmd->done = di_request_done;
 		di_run_command(cmd);
+		error = 0;
+		break;
+	done:
+		spin_unlock_irqrestore(&ddev->lock, flags);
+		if (!__blk_end_request_cur(req, error))
+			req = blk_peek_request(q);
 	}
 }
 
@@ -2151,7 +2149,7 @@ static int di_init_blk_dev(struct di_device *ddev)
 		goto err_blk_init_queue;
 	}
 
-	blk_queue_hardsect_size(queue, DI_SECTOR_SIZE);
+	blk_queue_logical_block_size(queue, DI_SECTOR_SIZE);
 	blk_queue_dma_alignment(queue, DI_DMA_ALIGN);
 	blk_queue_max_phys_segments(queue, 1);
 	blk_queue_max_hw_segments(queue, 1);
