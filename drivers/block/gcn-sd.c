@@ -1090,13 +1090,13 @@ static int sd_read_request(struct sd_host *host, struct request *req)
 	 * For now, we perform only 512 byte single block reads.
 	 */
 
-	start = req->sector << KERNEL_SECTOR_SHIFT;
+	start = blk_rq_pos(req) << KERNEL_SECTOR_SHIFT;
 #if 0
 	nr_blocks = req->current_nr_sectors >>
 			 (host->card.csd.read_blkbits - KERNEL_SECTOR_SHIFT);
 	block_len = 1 << host->card.csd.read_blkbits;
 #else
-	nr_blocks = req->current_nr_sectors;
+	nr_blocks = blk_rq_cur_sectors(req);
 	block_len = 1 << KERNEL_SECTOR_SHIFT;
 #endif
 
@@ -1134,8 +1134,8 @@ static int sd_write_request(struct sd_host *host, struct request *req)
 	/* FIXME?, maybe should use 2^WRITE_BL_LEN blocks */
 
 	/* kernel sectors and card write blocks are both 512 bytes long */
-	start = req->sector << KERNEL_SECTOR_SHIFT;
-	nr_blocks = req->current_nr_sectors;
+	start = blk_rq_pos(req) << KERNEL_SECTOR_SHIFT;
+	nr_blocks = blk_rq_cur_sectors(req);
 	block_len = 1 << KERNEL_SECTOR_SHIFT;
 
 	for (i = 0; i < nr_blocks; i++) {
@@ -1159,11 +1159,13 @@ static int sd_write_request(struct sd_host *host, struct request *req)
  * Returns:
  *  <0 in case of error.
  *  0  if request passes the checks
- *  >0 if request can be ignored
  */
 static int sd_check_request(struct sd_host *host, struct request *req)
 {
 	unsigned long nr_sectors;
+
+	if (!blk_fs_request(req))
+		return -EIO;
 
 	if (test_bit(__SD_MEDIA_CHANGED, &host->flags)) {
 		sd_printk(KERN_ERR, "media changed, aborting\n");
@@ -1176,13 +1178,10 @@ static int sd_check_request(struct sd_host *host, struct request *req)
 					KERNEL_SECTOR_SHIFT);
 
 	/* keep our reads within limits */
-	if (req->sector + req->current_nr_sectors > nr_sectors) {
+	if (blk_rq_pos(req) + blk_rq_cur_sectors(req) > nr_sectors) {
 		sd_printk(KERN_ERR, "reading past end, aborting\n");
 		return -EINVAL;
 	}
-
-	if (!blk_fs_request(req))
-		return 1;
 
 	return 0;
 }
@@ -1192,22 +1191,26 @@ static int sd_check_request(struct sd_host *host, struct request *req)
  */
 static int sd_do_request(struct sd_host *host, struct request *req)
 {
-	int retval;
+	int nr_sectors = 0;
+	int error;
 
-	retval = sd_check_request(host, req);
-	if (retval)
-		return 0;
+	error = sd_check_request(host, req);
+	if (error) {
+		nr_sectors = error;
+		goto out;
+	}
 
 	switch (rq_data_dir(req)) {
 	case WRITE:
-		retval = sd_write_request(host, req);
+		nr_sectors = sd_write_request(host, req);
 		break;
 	case READ:
-		retval = sd_read_request(host, req);
+		nr_sectors = sd_read_request(host, req);
 		break;
 	}
 
-	return retval;
+out:
+	return nr_sectors;
 }
 
 /*
@@ -1239,7 +1242,7 @@ static int sd_io_thread(void *param)
 
 		spin_lock_irqsave(&host->queue_lock, flags);
 		if (!blk_queue_plugged(host->queue))
-			req = elv_next_request(host->queue);
+			req = blk_fetch_request(host->queue);
 		spin_unlock_irqrestore(&host->queue_lock, flags);
 
 		if (!req) {
@@ -1401,7 +1404,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	}
 
 	/* inform the block layer about various sizes */
-	blk_queue_hardsect_size(host->queue, 1 << KERNEL_SECTOR_SHIFT);
+	blk_queue_logical_block_size(host->queue, 1 << KERNEL_SECTOR_SHIFT);
 	set_capacity(host->disk, host->card.csd.capacity <<
 			 (host->card.csd.read_blkbits - KERNEL_SECTOR_SHIFT));
 
