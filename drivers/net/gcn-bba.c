@@ -718,7 +718,8 @@ static int bba_rx(struct net_device *dev, int budget)
 		received++;
 
 		/* move read pointer to next packet */
-		bba_out12(BBA_RRP, rrp = descr.next_packet_ptr);
+		rrp = descr.next_packet_ptr;
+		bba_out12(BBA_RRP, rrp);
 
 		/* get write pointer and continue */
 		rwp = bba_in12(BBA_RWP);
