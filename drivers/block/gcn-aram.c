@@ -88,7 +88,7 @@ static char aram_driver_version[] = "4.0i";
  * Driver data.
  */
 struct aram_drvdata {
-	spinlock_t			lock;
+	spinlock_t			queue_lock;
 
 	spinlock_t			io_lock;
 	void __iomem			*io_base;
@@ -98,7 +98,7 @@ struct aram_drvdata {
 	struct gendisk			*disk;
 	struct request_queue		*queue;
 
-	struct request			*req;
+	struct request			*req;	/* protected by ->io_lock */
 	dma_addr_t			dma_addr;
 	size_t				dma_len;
 
@@ -168,24 +168,29 @@ static irqreturn_t aram_irq_handler(int irq, void *dev0)
 	csr &= ~(DSP_CSR_AIDINT | DSP_CSR_DSPINT);
 	out_be16(csr_reg, csr);
 
-	/* pick up current request being serviced */
+	/* pick up request in service */
 	req = drvdata->req;
 	drvdata->req = NULL;
-
-	spin_unlock_irqrestore(&drvdata->io_lock, flags);
-
-	if (req) {
-		__blk_end_request(req, 0, req->current_nr_sectors << 9);
+	if (drvdata->dma_len) {
 		dma_unmap_single(drvdata->dev,
 				 drvdata->dma_addr, drvdata->dma_len,
 				 rq_dir_to_dma_dir(req));
-		spin_lock(&drvdata->lock);
-		blk_start_queue(drvdata->queue);
-		spin_unlock(&drvdata->lock);
-	} else {
-		drv_printk(KERN_ERR, "ignoring interrupt, no request\n");
+		drvdata->dma_len = 0;
 	}
 
+	spin_unlock_irqrestore(&drvdata->io_lock, flags);
+
+	if (!req) {
+		drv_printk(KERN_ERR, "ignoring interrupt, no request\n");
+		goto out;
+	}
+
+	spin_lock(&drvdata->queue_lock);
+	__blk_end_request_cur(req, 0);
+	blk_start_queue(drvdata->queue);
+	spin_unlock(&drvdata->queue_lock);
+
+out:
 	return IRQ_HANDLED;
 }
 
@@ -196,57 +201,51 @@ static void aram_do_request(struct request_queue *q)
 	unsigned long aram_addr;
 	size_t len;
 	unsigned long flags;
+	int error;
 
-	req = elv_next_request(q);
+	req = blk_peek_request(q);
 	while (req) {
 		spin_lock_irqsave(&drvdata->io_lock, flags);
-
-		/* we schedule a single request each time */
 		if (drvdata->req) {
-			spin_unlock_irqrestore(&drvdata->io_lock, flags);
 			blk_stop_queue(q);
+			spin_unlock_irqrestore(&drvdata->io_lock, flags);
 			break;
 		}
 
-		blkdev_dequeue_request(req);
+		blk_start_request(req);
+		error = -EIO;
 
-		/* ignore requests that we can't handle */
-		if (!blk_fs_request(req)) {
-			spin_unlock_irqrestore(&drvdata->io_lock, flags);
-			continue;
-		}
-
-		/* store the request being handled */
-		drvdata->req = req;
-		blk_stop_queue(q);
-
-		spin_unlock_irqrestore(&drvdata->io_lock, flags);
+		if (!blk_fs_request(req))
+			goto done;
 
 		/* calculate the ARAM address and length */
-		aram_addr = req->sector << 9;
-		len = req->current_nr_sectors << 9;
+		aram_addr = blk_rq_pos(req) << 9;
+		len = blk_rq_cur_bytes(req);
 
 		/* give up if the request goes out of bounds */
 		if (aram_addr + len > ARAM_BUFFERSIZE) {
 			drv_printk(KERN_ERR, "bad access: block=%lu,"
-				   " size=%u\n", (unsigned long)req->sector,
+				   " size=%u\n", (unsigned long)blk_rq_pos(req),
 				    len);
-			/* XXX correct? the request is already dequeued */
-			end_request(req, 0);
-			continue;
+			goto done;
 		}
 
-		BUG_ON(req->nr_phys_segments != 1);
+		drvdata->req = req;
+		spin_unlock_irqrestore(&drvdata->io_lock, flags);
 
-		/* perform DMA mappings */
+		/* perform DMA mappings and start the transfer */
 		drvdata->dma_len = len;
 		drvdata->dma_addr = dma_map_single(drvdata->dev,
 						   req->buffer, len,
 						   rq_dir_to_dma_dir(req));
-
-		/* start the DMA transfer */
 		aram_start_dma_transfer(drvdata, aram_addr);
+
+		/* one request at a time */
 		break;
+	done:
+		spin_unlock_irqrestore(&drvdata->io_lock, flags);
+		if (!__blk_end_request_cur(req, error))
+			req = blk_peek_request(q);
 	}
 }
 
@@ -261,7 +260,7 @@ static int aram_open(struct block_device *bdev, fmode_t mode)
 	unsigned long flags;
 	int retval = 0;
 
-	spin_lock_irqsave(&drvdata->lock, flags);
+	spin_lock_irqsave(&drvdata->queue_lock, flags);
 
 	/* only allow a minor of 0 to be opened */
 	if (MINOR(bdev->bd_dev)) {
@@ -282,7 +281,7 @@ static int aram_open(struct block_device *bdev, fmode_t mode)
 		drvdata->ref_count++;
 
 out:
-	spin_unlock_irqrestore(&drvdata->lock, flags);
+	spin_unlock_irqrestore(&drvdata->queue_lock, flags);
 	return retval;
 }
 
@@ -291,12 +290,12 @@ static int aram_release(struct gendisk *disk, fmode_t mode)
 	struct aram_drvdata *drvdata = disk->private_data;
 	unsigned long flags;
 
-	spin_lock_irqsave(&drvdata->lock, flags);
+	spin_lock_irqsave(&drvdata->queue_lock, flags);
 	if (drvdata->ref_count > 0)
 		drvdata->ref_count--;
 	else
 		drvdata->ref_count = 0;
-	spin_unlock_irqrestore(&drvdata->lock, flags);
+	spin_unlock_irqrestore(&drvdata->queue_lock, flags);
 
 	return 0;
 }
@@ -335,13 +334,13 @@ static int aram_init_blk_dev(struct aram_drvdata *drvdata)
 		goto err_register_blkdev;
 
 	retval = -ENOMEM;
-	spin_lock_init(&drvdata->lock);
+	spin_lock_init(&drvdata->queue_lock);
 	spin_lock_init(&drvdata->io_lock);
-	queue = blk_init_queue(aram_do_request, &drvdata->lock);
+	queue = blk_init_queue(aram_do_request, &drvdata->queue_lock);
 	if (!queue)
 		goto err_blk_init_queue;
 
-	blk_queue_hardsect_size(queue, ARAM_SECTOR_SIZE);
+	blk_queue_logical_block_size(queue, ARAM_SECTOR_SIZE);
 	blk_queue_dma_alignment(queue, ARAM_DMA_ALIGN);
 	blk_queue_max_phys_segments(queue, 1);
 	blk_queue_max_hw_segments(queue, 1);
