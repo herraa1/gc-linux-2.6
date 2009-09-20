@@ -209,7 +209,8 @@ static int mi_probe(struct device *device, struct resource *mem, int irq)
 #ifdef CONFIG_PROC_FS
 	{
 	struct platform_device *pdev = to_platform_device(device);
-	priv->proc_file = create_proc_read_entry(pdev->dev.bus_id, 0444, NULL,
+	priv->proc_file = create_proc_read_entry(dev_name(&pdev->dev),
+						 0444, NULL,
 						 mi_proc_read, priv);
 	}
 #endif /* CONFIG_PROC_FS */
@@ -240,7 +241,7 @@ static void mi_remove(struct mi_private *priv)
 {
 #ifdef CONFIG_PROC_FS
 	struct platform_device *pdev = to_platform_device(priv->device);
-	remove_proc_entry(pdev->dev.bus_id, NULL);
+	remove_proc_entry(dev_name(&pdev->dev), NULL);
 #endif /* CONFIG_PROC_FS */
 
 	mi_shutdown(priv);
