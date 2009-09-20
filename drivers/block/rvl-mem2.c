@@ -72,38 +72,38 @@ static void mem2_do_request(struct request_queue *q)
 	size_t len;
 	int error;
 
-	req = elv_next_request(q);
+	req = blk_fetch_request(q);
 	while (req) {
-		if (blk_fs_request(req)) {
-			/* calculate the MEM2 address and length */
-			mem2_addr = req->sector << 9;
-			len = req->current_nr_sectors << 9;
+		error = -EIO;
 
-			/* give up if the request goes out of bounds */
-			if (mem2_addr + len > drvdata->size) {
-				drv_printk(KERN_ERR, "bad access: block=%lu,"
-					    " size=%u\n",
-					    (unsigned long)req->sector, len);
-				error = -EIO;
-			} else {
-				switch (rq_data_dir(req)) {
-				case READ:
-					memcpy(req->buffer,
-					       drvdata->io_base + mem2_addr,
-					       len);
-					break;
-				case WRITE:
-					memcpy(drvdata->io_base + mem2_addr,
-					       req->buffer, len);
-					break;
-				}
-				error = 0;
-			}
-			__blk_end_request(req, error, len);
-		} else {
-			end_request(req, 0);
+		if (!blk_fs_request(req))
+			goto done;
+
+		/* calculate the MEM2 address and length */
+		mem2_addr = blk_rq_pos(req) << 9;
+		len = blk_rq_cur_bytes(req);
+
+		/* give up if the request goes out of bounds */
+		if (mem2_addr + len > drvdata->size) {
+			drv_printk(KERN_ERR, "bad access: block=%lu,"
+				   " size=%zu\n",
+				   (unsigned long)blk_rq_pos(req), len);
+			goto done;
 		}
-		req = elv_next_request(q);
+
+		switch (rq_data_dir(req)) {
+		case READ:
+			memcpy(req->buffer, drvdata->io_base + mem2_addr, len);
+			break;
+		case WRITE:
+			memcpy(drvdata->io_base + mem2_addr, req->buffer, len);
+			break;
+		}
+		error = 0;
+
+	done:
+		if (!__blk_end_request_cur(req, error));
+			req = blk_fetch_request(q);
 	}
 }
 
@@ -197,7 +197,7 @@ static int mem2_init_blk_dev(struct mem2_drvdata *drvdata)
 	if (!queue)
 		goto err_blk_init_queue;
 
-	blk_queue_hardsect_size(queue, MEM2_SECTOR_SIZE);
+	blk_queue_logical_block_size(queue, MEM2_SECTOR_SIZE);
 	blk_queue_max_phys_segments(queue, 1);
 	blk_queue_max_hw_segments(queue, 1);
 	queue_flag_set_unlocked(QUEUE_FLAG_NONROT, queue);
