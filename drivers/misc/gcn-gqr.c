@@ -37,7 +37,7 @@ static struct ctl_table_header *gqr_table_header;
 #define MFSPR_CASE(i) case (i): (*((u32 *)table->data) = mfspr(SPR_GQR##i))
 #define MTSPR_CASE(i) case (i): mtspr(SPR_GQR##i, *((u32 *)table->data))
 
-static int proc_dogqr(ctl_table *table, int write, struct file *file,
+static int proc_dogqr(struct ctl_table *table, int write,
 		      void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int r;
@@ -57,7 +57,7 @@ static int proc_dogqr(ctl_table *table, int write, struct file *file,
 		}
 	}
 
-	r = proc_dointvec(table, write, file, buffer, lenp, ppos);
+	r = proc_dointvec(table, write, buffer, lenp, ppos);
 
 	if ((r == 0) && write) {  /* if they are writing, update the reg */
 		switch (table->data - (void *)gqr_values) {
@@ -86,7 +86,7 @@ static int proc_dogqr(ctl_table *table, int write, struct file *file,
 		.proc_handler = &proc_dogqr       \
 	}
 
-static ctl_table gqr_members[] = {
+static struct ctl_table gqr_members[] = {
 	DECLARE_GQR(0),
 	DECLARE_GQR(1),
 	DECLARE_GQR(2),
@@ -98,7 +98,7 @@ static ctl_table gqr_members[] = {
 	{ .ctl_name = 0 }
 };
 
-static ctl_table gqr_table[] = {
+static struct ctl_table gqr_table[] = {
 	{
 		.ctl_name = CTL_UNNUMBERED,
 		.procname = "gqr",
