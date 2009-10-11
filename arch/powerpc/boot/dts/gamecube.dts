@@ -22,7 +22,11 @@
 
 	chosen {
 		bootargs = "root=/dev/nfs nfsroot=192.168.001.253:/nfsroot/cube,nfsvers=3,udp ip=on video=gcn-vifb:tv=auto force_keyboard_port=4";
-		linux,stdout-path = "/exi@0c006800/usbgecko@0c006814";
+		linux,stdout-path = &USBGECKO0;
+	};
+
+	aliases {
+		ugecon = &USBGECKO0;
 	};
 
 	memory {
@@ -49,29 +53,6 @@
 		};
 	};
 
-	pic: pic@0c003000 {
-		#interrupt-cells = <1>;
-		compatible = "nintendo,flipper-pic";
-		reg = <0x0c003000 0x8>;
-		interrupt-controller;
-	};
-
-	/* External Interface bus */
-	exi@0c006800 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		compatible = "nintendo,flipper-exi";
-		reg = <0x0c006800 0x40>;
-		interrupts = <4>;
-		interrupt-parent = <&pic>;
-
-		udbg_console: usbgecko@0c006814 {
-			compatible = "usbgecko,usbgecko";
-			reg = <0x0c006814 0x14>;
-			virtual-reg = <0xcc006814>;
-		};
-	};
-
 	/* devices contained int the flipper chipset */
 	soc {
 		#address-cells = <1>;
@@ -89,6 +70,13 @@
 			interrupt-parent = <&pic>;
 			xfb-start = <0x01698000>; /* end-of-ram - xfb-size */
 			xfb-size = <0x168000>;
+		};
+
+		pic: pic@0c003000 {
+			#interrupt-cells = <1>;
+			compatible = "nintendo,flipper-pic";
+			reg = <0x0c003000 0x8>;
+			interrupt-controller;
 		};
 
 		resetswitch@0c003000 {
@@ -125,6 +113,22 @@
 			reg = <0x0c006400 0x100>;
 			interrupts = <3>;
 			interrupt-parent = <&pic>;
+		};
+
+		/* External Interface bus */
+		exi@0c006800 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "nintendo,flipper-exi";
+			reg = <0x0c006800 0x40>;
+			interrupts = <4>;
+			interrupt-parent = <&pic>;
+
+			USBGECKO0: usbgecko@0c006814 {
+				compatible = "usbgecko,usbgecko";
+				reg = <0x0c006814 0x14>;
+				virtual-reg = <0xcc006814>;
+			};
 		};
         };
 };
