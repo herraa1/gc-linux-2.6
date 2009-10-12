@@ -225,8 +225,8 @@
 			};
 		};
 
-		gpio0: starlet-gpio@0d8000c0 {
-			compatible = "nintendo,starlet-gpio";
+		gpio0: hollywood-gpio@0d8000c0 {
+			compatible = "nintendo,hollywood-gpio";
 			reg = <0x0d8000c0 0x4>;
 			gpio-controller;
 			#gpio-cells = <2>;

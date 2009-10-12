@@ -1,7 +1,7 @@
 /*
- * arch/powerpc/platforms/embedded6xx/starlet-gpio.c
+ * arch/powerpc/platforms/embedded6xx/hlwd-gpio.c
  *
- * Nintendo Wii starlet GPIO driver
+ * Nintendo Wii (Hollywood) GPIO driver
  * Copyright (C) 2008-2009 The GameCube Linux Team
  * Copyright (C) 2008,2009 Albert Herranz
  *
@@ -18,32 +18,32 @@
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
 
-#define DRV_MODULE_NAME "starlet-gpio"
+#define DRV_MODULE_NAME "hlwd-gpio"
 
 #define drv_printk(level, format, arg...) \
 	printk(level DRV_MODULE_NAME ": " format , ## arg)
 
 
-struct stgpio_chip {
+struct hlwd_gpio_chip {
 	struct of_mm_gpio_chip mmchip;
 	spinlock_t lock;
 };
 
-struct stgpio_regs {
+struct hlwd_gpio_regs {
 	__be32 out, dir, in;
 };
 
 
-static inline struct stgpio_chip *
-to_stgpio_chip(struct of_mm_gpio_chip *mm_gc)
+static inline struct hlwd_gpio_chip *
+to_hlwd_gpio_chip(struct of_mm_gpio_chip *mm_gc)
 {
-	return container_of(mm_gc, struct stgpio_chip, mmchip);
+	return container_of(mm_gc, struct hlwd_gpio_chip, mmchip);
 }
 
-static int stgpio_get(struct gpio_chip *gc, unsigned int gpio)
+static int hlwd_gpio_get(struct gpio_chip *gc, unsigned int gpio)
 {
 	struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
-	struct stgpio_regs __iomem *regs = mm_gc->regs;
+	struct hlwd_gpio_regs __iomem *regs = mm_gc->regs;
 	u32 pin_mask = 1 << (31 - gpio);
 	unsigned int val;
 
@@ -54,11 +54,11 @@ static int stgpio_get(struct gpio_chip *gc, unsigned int gpio)
 	return val;
 }
 
-static void stgpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
+static void hlwd_gpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
 {
 	struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
-	struct stgpio_chip *st_gc = to_stgpio_chip(mm_gc);
-	struct stgpio_regs __iomem *regs = mm_gc->regs;
+	struct hlwd_gpio_chip *st_gc = to_hlwd_gpio_chip(mm_gc);
+	struct hlwd_gpio_regs __iomem *regs = mm_gc->regs;
 	u32 pin_mask = 1 << (31 - gpio);
 	u32 data;
 	unsigned long flags;
@@ -73,10 +73,10 @@ static void stgpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
 	pr_debug("%s: gpio: %d val: %d\n", __func__, gpio, val);
 }
 
-static int stgpio_dir_in(struct gpio_chip *gc, unsigned int gpio)
+static int hlwd_gpio_dir_in(struct gpio_chip *gc, unsigned int gpio)
 {
 	struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
-	struct stgpio_regs __iomem *regs = mm_gc->regs;
+	struct hlwd_gpio_regs __iomem *regs = mm_gc->regs;
 	u32 pin_mask = 1 << (31 - gpio);
 
 	clrbits32(&regs->dir, pin_mask);
@@ -84,24 +84,24 @@ static int stgpio_dir_in(struct gpio_chip *gc, unsigned int gpio)
 	return 0;
 }
 
-static int stgpio_dir_out(struct gpio_chip *gc, unsigned int gpio, int val)
+static int hlwd_gpio_dir_out(struct gpio_chip *gc, unsigned int gpio, int val)
 {
 	struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
-	struct stgpio_regs __iomem *regs = mm_gc->regs;
+	struct hlwd_gpio_regs __iomem *regs = mm_gc->regs;
 	u32 pin_mask = 1 << (31 - gpio);
 
 	setbits32(&regs->dir, pin_mask);
-	stgpio_set(gc, gpio, val);
+	hlwd_gpio_set(gc, gpio, val);
 
 	return 0;
 }
 
-int stgpio_add32(struct device_node *np)
+int hlwd_gpio_add32(struct device_node *np)
 {
 	struct of_mm_gpio_chip *mm_gc;
 	struct of_gpio_chip *of_gc;
 	struct gpio_chip *gc;
-	struct stgpio_chip *st_gc;
+	struct hlwd_gpio_chip *st_gc;
 	const unsigned long *prop;
 	int error;
 
@@ -121,10 +121,10 @@ int stgpio_add32(struct device_node *np)
 		of_gc->gpio_cells = 2; /* gpio pin number, flags */
 
 	gc->ngpio = 32;
-	gc->direction_input = stgpio_dir_in;
-	gc->direction_output = stgpio_dir_out;
-	gc->get = stgpio_get;
-	gc->set = stgpio_set;
+	gc->direction_input = hlwd_gpio_dir_in;
+	gc->direction_output = hlwd_gpio_dir_out;
+	gc->get = hlwd_gpio_get;
+	gc->set = hlwd_gpio_set;
 
 	error = of_mm_gpiochip_add(np, mm_gc);
 	if (!error)
@@ -133,18 +133,18 @@ int stgpio_add32(struct device_node *np)
 	return error;
 }
 
-static int stgpio_init(void)
+static int hlwd_gpio_init(void)
 {
 	struct device_node *np;
 	int error;
 
-	for_each_compatible_node(np, NULL, "nintendo,starlet-gpio") {
-		error = stgpio_add32(np);
+	for_each_compatible_node(np, NULL, "nintendo,hollywood-gpio") {
+		error = hlwd_gpio_add32(np);
 		if (error < 0)
 			drv_printk(KERN_ERR, "error %d adding gpios"
 				   " for %s\n", error, np->full_name);
 	}
 	return 0; /* whatever */
 }
-arch_initcall(stgpio_init);
+arch_initcall(hlwd_gpio_init);
 
