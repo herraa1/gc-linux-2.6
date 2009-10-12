@@ -88,39 +88,37 @@ static void wii_ios_power_off(void)
 
 #ifdef CONFIG_STARLET_MINI
 
-static void wii_mipc_restart(char *cmd)
+static void wii_restart(char *cmd)
 {
 	void __iomem *hw_resets;
 
 	local_irq_disable();
 
-	hw_resets = mipc_ioremap(0x0d800194, 4);
+	hw_resets = ioremap(0x0d800194, 4);
 	if (hw_resets) {
 		/* clear the system reset pin to cause a reset */
-		mipc_clear_bit(0, hw_resets);
-		mipc_wmb();
-		mipc_iounmap(hw_resets);
+		clear_bit(0, hw_resets);
+		iounmap(hw_resets);
 	}
 
 	for (;;)
 		cpu_relax();
 }
 
-static void wii_mipc_power_off(void)
+static void wii_power_off(void)
 {
 	void __iomem *gpio;
 
 	local_irq_disable();
 
-	gpio = mipc_ioremap(0x0d8000e0, 3*4);
+	gpio = ioremap(0x0d8000e0, 3*4);
 	if (gpio) {
 		/* make sure that the poweroff GPIO is configured as output */
-		mipc_out_be32(gpio + 4, mipc_in_be32(gpio + 4) | 0x2);
+		out_be32(gpio + 4, in_be32(gpio + 4) | 0x2);
 
 		/* drive the poweroff GPIO high */
-		mipc_out_be32(gpio + 0, mipc_in_be32(gpio + 0) | 0x2);
-		mipc_wmb();
-		mipc_iounmap(gpio);
+		out_be32(gpio + 0, in_be32(gpio + 0) | 0x2);
+		iounmap(gpio);
 	}
 
 	for (;;)
@@ -129,12 +127,12 @@ static void wii_mipc_power_off(void)
 
 #else
 
-static void wii_mipc_restart(char *cmd)
+static void wii_restart(char *cmd)
 {
 	wii_death_loop();
 }
 
-static void wii_mipc_power_off(void)
+static void wii_power_off(void)
 {
 	wii_death_loop();
 }
@@ -162,8 +160,8 @@ int starlet_discover_ipc_flavour(void)
 	error = mipc_discover(&hdrp);
 	if (!error) {
 		starlet_ipc_flavour = STARLET_IPC_MINI;
-		ppc_md.restart = wii_mipc_restart;
-		ppc_md.power_off = wii_mipc_power_off;
+		ppc_md.restart = wii_restart;
+		ppc_md.power_off = wii_power_off;
 	} else {
 		starlet_ipc_flavour = STARLET_IPC_IOS;
 		ppc_md.restart = wii_ios_restart;
