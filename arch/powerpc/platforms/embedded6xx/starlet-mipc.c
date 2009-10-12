@@ -24,7 +24,7 @@
 #include <asm/time.h>		/* for get_tbl() */
 #include <asm/starlet-mini.h>
 
-#include "hollywood-pic.h"
+#include "hlwd-pic.h"
 
 
 #define DRV_MODULE_NAME		"starlet-mipc"
@@ -910,7 +910,7 @@ static int mipc_do_probe(struct device *dev, struct resource *mem, int irq)
 	}
 
 	drv_printk(KERN_INFO, "ready\n");
-	hollywood_pic_probe();
+	hlwd_pic_probe();
 
 out:
 	return error;

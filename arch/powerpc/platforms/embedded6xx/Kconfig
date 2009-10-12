@@ -126,7 +126,7 @@ config FLIPPER_PIC
 	depends on GAMECUBE_COMMON
 	default y
 
-config HOLLYWOOD_PIC
+config HLWD_PIC
 	bool
 	depends on STARLET_MINI
 	default y

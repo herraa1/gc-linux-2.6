@@ -1,7 +1,7 @@
 /*
- * arch/powerpc/platforms/embedded6xx/hollywood-pic.c
+ * arch/powerpc/platforms/embedded6xx/hlwd-pic.c
  *
- * Nintendo Wii "hollywood" interrupt controller support.
+ * Nintendo Wii "Hollywood" interrupt controller support.
  * Copyright (C) 2009 The GameCube Linux Team
  * Copyright (C) 2009 Albert Herranz
  *
@@ -18,16 +18,16 @@
 #include <linux/of.h>
 #include <asm/io.h>
 
-#include "hollywood-pic.h"
+#include "hlwd-pic.h"
 
 
-#define DRV_MODULE_NAME "hollywood-pic"
+#define DRV_MODULE_NAME "hlwd-pic"
 
 #define drv_printk(level, format, arg...) \
 	 printk(level DRV_MODULE_NAME ": " format , ## arg)
 
 
-#define HOLLYWOOD_NR_IRQS	32
+#define HLWD_NR_IRQS	32
 
 /*
  * Each interrupt has a corresponding bit in both
@@ -46,7 +46,7 @@
  *
  */
 
-static void hollywood_pic_mask_and_ack(unsigned int virq)
+static void hlwd_pic_mask_and_ack(unsigned int virq)
 {
 	int irq = virq_to_hw(virq);
 	void __iomem *io_base = get_irq_chip_data(virq);
@@ -55,7 +55,7 @@ static void hollywood_pic_mask_and_ack(unsigned int virq)
 	set_bit(irq, io_base + HW_BROADWAY_ICR);
 }
 
-static void hollywood_pic_ack(unsigned int virq)
+static void hlwd_pic_ack(unsigned int virq)
 {
 	int irq = virq_to_hw(virq);
 	void __iomem *io_base = get_irq_chip_data(virq);
@@ -63,7 +63,7 @@ static void hollywood_pic_ack(unsigned int virq)
 	set_bit(irq, io_base + HW_BROADWAY_ICR);
 }
 
-static void hollywood_pic_mask(unsigned int virq)
+static void hlwd_pic_mask(unsigned int virq)
 {
 	int irq = virq_to_hw(virq);
 	void __iomem *io_base = get_irq_chip_data(virq);
@@ -71,7 +71,7 @@ static void hollywood_pic_mask(unsigned int virq)
 	clear_bit(irq, io_base + HW_BROADWAY_IMR);
 }
 
-static void hollywood_pic_unmask(unsigned int virq)
+static void hlwd_pic_unmask(unsigned int virq)
 {
 	int irq = virq_to_hw(virq);
 	void __iomem *io_base = get_irq_chip_data(virq);
@@ -80,12 +80,12 @@ static void hollywood_pic_unmask(unsigned int virq)
 }
 
 
-static struct irq_chip hollywood_pic = {
-	.typename	= "hollywood-pic",
-	.ack		= hollywood_pic_ack,
-	.mask_ack	= hollywood_pic_mask_and_ack,
-	.mask		= hollywood_pic_mask,
-	.unmask		= hollywood_pic_unmask,
+static struct irq_chip hlwd_pic = {
+	.typename	= "hlwd-pic",
+	.ack		= hlwd_pic_ack,
+	.mask_ack	= hlwd_pic_mask_and_ack,
+	.mask		= hlwd_pic_mask,
+	.unmask		= hlwd_pic_unmask,
 };
 
 /*
@@ -93,28 +93,28 @@ static struct irq_chip hollywood_pic = {
  *
  */
 
-static struct irq_host *hollywood_irq_host;
+static struct irq_host *hlwd_irq_host;
 
-static int hollywood_pic_map(struct irq_host *h, unsigned int virq,
+static int hlwd_pic_map(struct irq_host *h, unsigned int virq,
 			   irq_hw_number_t hwirq)
 {
 	set_irq_chip_data(virq, h->host_data);
-	set_irq_chip_and_handler(virq, &hollywood_pic, handle_level_irq);
+	set_irq_chip_and_handler(virq, &hlwd_pic, handle_level_irq);
 	return 0;
 }
 
-static void hollywood_pic_unmap(struct irq_host *h, unsigned int irq)
+static void hlwd_pic_unmap(struct irq_host *h, unsigned int irq)
 {
 	set_irq_chip_data(irq, NULL);
 	set_irq_chip(irq, NULL);
 }
 
-static struct irq_host_ops hollywood_irq_host_ops = {
-	.map = hollywood_pic_map,
-	.unmap = hollywood_pic_unmap,
+static struct irq_host_ops hlwd_irq_host_ops = {
+	.map = hlwd_pic_map,
+	.unmap = hlwd_pic_unmap,
 };
 
-static unsigned int __hollywood_pic_get_irq(struct irq_host *h)
+static unsigned int __hlwd_pic_get_irq(struct irq_host *h)
 {
 	void __iomem *io_base = h->host_data;
 	int irq;
@@ -129,7 +129,7 @@ static unsigned int __hollywood_pic_get_irq(struct irq_host *h)
 	return irq_linear_revmap(h, 31 - irq);
 }
 
-static void hollywood_pic_irq_cascade(unsigned int cascade_virq,
+static void hlwd_pic_irq_cascade(unsigned int cascade_virq,
 				      struct irq_desc *desc)
 {
 	struct irq_host *irq_host = get_irq_data(cascade_virq);
@@ -139,7 +139,7 @@ static void hollywood_pic_irq_cascade(unsigned int cascade_virq,
 	desc->chip->mask(cascade_virq); /* IRQ_LEVEL */
 	spin_unlock(&desc->lock);
 
-	virq = __hollywood_pic_get_irq(irq_host);
+	virq = __hlwd_pic_get_irq(irq_host);
 	if (virq != NO_IRQ_IGNORE)
 		generic_handle_irq(virq);
 	else
@@ -157,14 +157,14 @@ static void hollywood_pic_irq_cascade(unsigned int cascade_virq,
  *
  */
 
-static void __hollywood_quiesce(void __iomem *io_base)
+static void __hlwd_quiesce(void __iomem *io_base)
 {
 	/* mask and ack all IRQs */
 	out_be32(io_base + HW_BROADWAY_IMR, 0);
 	out_be32(io_base + HW_BROADWAY_ICR, ~0);
 }
 
-struct irq_host *hollywood_pic_init(struct device_node *np)
+struct irq_host *hlwd_pic_init(struct device_node *np)
 {
 	struct irq_host *irq_host;
 	struct resource res;
@@ -184,10 +184,10 @@ struct irq_host *hollywood_pic_init(struct device_node *np)
 
 	drv_printk(KERN_INFO, "controller at 0x%p\n", io_base);
 
-	__hollywood_quiesce(io_base);
+	__hlwd_quiesce(io_base);
 
-	irq_host = irq_alloc_host(np, IRQ_HOST_MAP_LINEAR, HOLLYWOOD_NR_IRQS,
-				  &hollywood_irq_host_ops, NO_IRQ_IGNORE);
+	irq_host = irq_alloc_host(np, IRQ_HOST_MAP_LINEAR, HLWD_NR_IRQS,
+				  &hlwd_irq_host_ops, NO_IRQ_IGNORE);
 	if (!irq_host) {
 		drv_printk(KERN_ERR, "failed to allocate irq_host\n");
 		return NULL;
@@ -197,9 +197,9 @@ struct irq_host *hollywood_pic_init(struct device_node *np)
 	return irq_host;
 }
 
-unsigned int hollywood_pic_get_irq(void)
+unsigned int hlwd_pic_get_irq(void)
 {
-	return __hollywood_pic_get_irq(hollywood_irq_host);
+	return __hlwd_pic_get_irq(hlwd_irq_host);
 }
 
 /*
@@ -207,7 +207,7 @@ unsigned int hollywood_pic_get_irq(void)
  *
  */
 
-void hollywood_pic_probe(void)
+void hlwd_pic_probe(void)
 {
 	struct irq_host *host;
 	struct device_node *np;
@@ -217,26 +217,26 @@ void hollywood_pic_probe(void)
 	for_each_compatible_node(np, NULL, "nintendo,hollywood-pic") {
 		interrupts = of_get_property(np, "interrupts", NULL);
 		if (interrupts) {
-			host = hollywood_pic_init(np);
+			host = hlwd_pic_init(np);
 			BUG_ON(!host);
 			cascade_virq = irq_of_parse_and_map(np, 0);
 			set_irq_data(cascade_virq, host);
 			set_irq_chained_handler(cascade_virq,
-						hollywood_pic_irq_cascade);
+						hlwd_pic_irq_cascade);
 		}
 	}
 }
 
 /**
- * hollywood_quiesce() - quiesce hollywood irq controller
+ * hlwd_quiesce() - quiesce hollywood irq controller
  *
  * Mask and ack all interrupt sources.
  *
  */
-void hollywood_quiesce(void)
+void hlwd_quiesce(void)
 {
-	void __iomem *io_base = hollywood_irq_host->host_data;
+	void __iomem *io_base = hlwd_irq_host->host_data;
 
-	__hollywood_quiesce(io_base);
+	__hlwd_quiesce(io_base);
 }
 
