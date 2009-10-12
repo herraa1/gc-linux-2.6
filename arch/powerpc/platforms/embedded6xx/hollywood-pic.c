@@ -17,7 +17,6 @@
 #include <linux/irq.h>
 #include <linux/of.h>
 #include <asm/io.h>
-#include <asm/starlet-mini.h>
 
 #include "hollywood-pic.h"
 
@@ -52,9 +51,8 @@ static void hollywood_pic_mask_and_ack(unsigned int virq)
 	int irq = virq_to_hw(virq);
 	void __iomem *io_base = get_irq_chip_data(virq);
 
-	mipc_clear_bit(irq, io_base + HW_BROADWAY_IMR);
-	mipc_set_bit(irq, io_base + HW_BROADWAY_ICR);
-	mipc_wmb();
+	clear_bit(irq, io_base + HW_BROADWAY_IMR);
+	set_bit(irq, io_base + HW_BROADWAY_ICR);
 }
 
 static void hollywood_pic_ack(unsigned int virq)
@@ -62,8 +60,7 @@ static void hollywood_pic_ack(unsigned int virq)
 	int irq = virq_to_hw(virq);
 	void __iomem *io_base = get_irq_chip_data(virq);
 
-	mipc_set_bit(irq, io_base + HW_BROADWAY_ICR);
-	mipc_wmb();
+	set_bit(irq, io_base + HW_BROADWAY_ICR);
 }
 
 static void hollywood_pic_mask(unsigned int virq)
@@ -71,8 +68,7 @@ static void hollywood_pic_mask(unsigned int virq)
 	int irq = virq_to_hw(virq);
 	void __iomem *io_base = get_irq_chip_data(virq);
 
-	mipc_clear_bit(irq, io_base + HW_BROADWAY_IMR);
-	mipc_wmb();
+	clear_bit(irq, io_base + HW_BROADWAY_IMR);
 }
 
 static void hollywood_pic_unmask(unsigned int virq)
@@ -80,8 +76,7 @@ static void hollywood_pic_unmask(unsigned int virq)
 	int irq = virq_to_hw(virq);
 	void __iomem *io_base = get_irq_chip_data(virq);
 
-	mipc_set_bit(irq, io_base + HW_BROADWAY_IMR);
-	mipc_wmb();
+	set_bit(irq, io_base + HW_BROADWAY_IMR);
 }
 
 
@@ -125,8 +120,8 @@ static unsigned int __hollywood_pic_get_irq(struct irq_host *h)
 	int irq;
 	u32 irq_status;
 
-	irq_status = mipc_in_be32(io_base + HW_BROADWAY_ICR) &
-		     mipc_in_be32(io_base + HW_BROADWAY_IMR);
+	irq_status = in_be32(io_base + HW_BROADWAY_ICR) &
+		     in_be32(io_base + HW_BROADWAY_IMR);
 	if (irq_status == 0)
 		return NO_IRQ_IGNORE;	/* no more IRQs pending */
 
@@ -165,9 +160,8 @@ static void hollywood_pic_irq_cascade(unsigned int cascade_virq,
 static void __hollywood_quiesce(void __iomem *io_base)
 {
 	/* mask and ack all IRQs */
-	mipc_out_be32(io_base + HW_BROADWAY_IMR, 0);
-	mipc_out_be32(io_base + HW_BROADWAY_ICR, ~0);
-	mipc_wmb();
+	out_be32(io_base + HW_BROADWAY_IMR, 0);
+	out_be32(io_base + HW_BROADWAY_ICR, ~0);
 }
 
 struct irq_host *hollywood_pic_init(struct device_node *np)
@@ -182,7 +176,7 @@ struct irq_host *hollywood_pic_init(struct device_node *np)
 		drv_printk(KERN_ERR, "no io memory range found\n");
 		return NULL;
 	}
-	io_base = mipc_ioremap(res.start, resource_size(&res));
+	io_base = ioremap(res.start, resource_size(&res));
 	if (!io_base) {
 		drv_printk(KERN_ERR, "ioremap failed\n");
 		return NULL;
