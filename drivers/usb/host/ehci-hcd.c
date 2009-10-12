@@ -1121,7 +1121,7 @@ MODULE_LICENSE ("GPL");
 #endif
 
 #ifdef CONFIG_USB_EHCI_HCD_MIPC
-#include "ehci-mipc.c"
+#include "ehci-hlwd.c"
 #define OF_PLATFORM_DRIVER	ehci_hcd_mipc_driver
 #endif
 
