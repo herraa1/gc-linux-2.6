@@ -575,13 +575,13 @@ static inline struct usb_hcd *ohci_to_hcd (const struct ohci_hcd *ohci)
 static inline unsigned int _ohci_readl(const struct ohci_hcd *ohci,
 				       __hc32 __iomem *regs)
 {
-	return mipc_in_be32(regs);
+	return in_be32(regs);
 }
 
 static inline void _ohci_writel(const struct ohci_hcd *ohci,
 				const unsigned int val, __hc32 __iomem *regs)
 {
-	mipc_out_be32(regs, val);
+	out_be32(regs, val);
 }
 
 extern void ohci_mipc_control_quirk(struct ohci_hcd *ohci);
