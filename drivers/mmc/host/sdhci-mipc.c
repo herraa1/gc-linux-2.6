@@ -54,22 +54,22 @@ struct sdhci_mipc_host {
 
 static u32 sdhci_mipc_readl(struct sdhci_host *host, int reg)
 {
-	return mipc_in_be32(host->ioaddr + reg);
+	return in_be32(host->ioaddr + reg);
 }
 
 static u16 sdhci_mipc_readw(struct sdhci_host *host, int reg)
 {
-	return mipc_in_be16(host->ioaddr + (reg ^ 0x2));
+	return in_be16(host->ioaddr + (reg ^ 0x2));
 }
 
 static u8 sdhci_mipc_readb(struct sdhci_host *host, int reg)
 {
-	return mipc_in_8(host->ioaddr + (reg ^ 0x3));
+	return in_8(host->ioaddr + (reg ^ 0x3));
 }
 
 static void sdhci_mipc_writel(struct sdhci_host *host, u32 val, int reg)
 {
-	mipc_out_be32(host->ioaddr + reg, val);
+	out_be32(host->ioaddr + reg, val);
 	udelay(5);
 }
 
@@ -92,8 +92,8 @@ static void sdhci_mipc_writew(struct sdhci_host *host, u16 val, int reg)
 				  SDHCI_TRANSFER_MODE);
 		return;
 	}
-	mipc_clrsetbits_be32(host->ioaddr + base,
-			     0xffff << shift, val << shift);
+	clrsetbits_be32(host->ioaddr + base,
+			0xffff << shift, val << shift);
 	udelay(5);
 }
 
@@ -102,7 +102,7 @@ static void sdhci_mipc_writeb(struct sdhci_host *host, u8 val, int reg)
 	int base = reg & ~0x3;
 	int shift = (reg & 0x3) * 8;
 
-	mipc_clrsetbits_be32(host->ioaddr + base , 0xff << shift, val << shift);
+	clrsetbits_be32(host->ioaddr + base , 0xff << shift, val << shift);
 	udelay(5);
 }
 
@@ -178,7 +178,7 @@ static int __devinit sdhci_mipc_probe(struct of_device *ofdev,
 		goto err_no_address;
 	}
 
-	host->ioaddr = mipc_ioremap(res.start, resource_size(&res));
+	host->ioaddr = ioremap(res.start, resource_size(&res));
 	if (!host->ioaddr) {
 		DBG("ioremap failed\n");
 		error = -EINVAL;
@@ -209,7 +209,7 @@ static int __devinit sdhci_mipc_probe(struct of_device *ofdev,
 err_add_host:
 	irq_dispose_mapping(host->irq);
 err_no_irq:
-	mipc_iounmap(host->ioaddr);
+	iounmap(host->ioaddr);
 err_ioremap:
 err_no_address:
 	sdhci_free_host(host);
@@ -223,7 +223,7 @@ static int __devexit sdhci_mipc_remove(struct of_device *ofdev)
 
 	sdhci_remove_host(host, 0);
 	irq_dispose_mapping(host->irq);
-	mipc_iounmap(host->ioaddr);
+	iounmap(host->ioaddr);
 	sdhci_free_host(host);
 	return 0;
 }
