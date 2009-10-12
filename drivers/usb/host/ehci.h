@@ -606,13 +606,13 @@ ehci_port_speed(struct ehci_hcd *ehci, unsigned int portsc)
 static inline unsigned int ehci_readl(const struct ehci_hcd *ehci,
 				      __u32 __iomem *regs)
 {
-	return mipc_in_be32(regs);
+	return in_be32(regs);
 }
 
 static inline void ehci_writel(const struct ehci_hcd *ehci,
 			       const unsigned int val, __u32 __iomem *regs)
 {
-	mipc_out_be32(regs, val);
+	out_be32(regs, val);
 }
 
 #else
