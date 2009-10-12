@@ -1066,7 +1066,7 @@ MODULE_LICENSE ("GPL");
 #endif
 
 #ifdef CONFIG_USB_OHCI_HCD_MIPC
-#include "ohci-mipc.c"
+#include "ohci-hlwd.c"
 #define OF_PLATFORM_DRIVER	ohci_hcd_mipc_driver
 #endif
 
