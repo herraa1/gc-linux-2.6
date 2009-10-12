@@ -1120,9 +1120,9 @@ MODULE_LICENSE ("GPL");
 #define OF_PLATFORM_DRIVER	ehci_hcd_ppc_of_driver
 #endif
 
-#ifdef CONFIG_USB_EHCI_HCD_MIPC
+#ifdef CONFIG_USB_EHCI_HCD_HLWD
 #include "ehci-hlwd.c"
-#define OF_PLATFORM_DRIVER	ehci_hcd_mipc_driver
+#define OF_PLATFORM_DRIVER	ehci_hcd_hlwd_driver
 #endif
 
 #ifdef CONFIG_PLAT_ORION

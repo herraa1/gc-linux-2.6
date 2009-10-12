@@ -599,7 +599,7 @@ ehci_port_speed(struct ehci_hcd *ehci, unsigned int portsc)
 #define ehci_big_endian_mmio(e)		0
 #endif
 
-#ifdef CONFIG_USB_EHCI_HCD_MIPC
+#ifdef CONFIG_USB_EHCI_HCD_HLWD
 
 #include <asm/starlet-mini.h>
 
@@ -650,7 +650,7 @@ static inline void ehci_writel(const struct ehci_hcd *ehci,
 #endif
 }
 
-#endif /* CONFIG_USB_EHCI_HCD_MIPC */
+#endif /* CONFIG_USB_EHCI_HCD_HLWD */
 
 /*
  * On certain ppc-44x SoC there is a HW issue, that could only worked around with
