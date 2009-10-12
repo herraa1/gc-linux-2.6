@@ -229,14 +229,14 @@ config USB_OHCI_HCD_PPC_OF
 	depends on USB_OHCI_HCD && PPC_OF
 	default USB_OHCI_HCD_PPC_OF_BE || USB_OHCI_HCD_PPC_OF_LE
 
-config USB_OHCI_HCD_MIPC
-	bool "Nintendo Wii OHCI USB controller support via 'mini'"
+config USB_OHCI_HCD_HLWD
+	bool "Nintendo Wii (Hollywood) OHCI USB controller support"
 	depends on USB_OHCI_HCD && STARLET_MINI
 	select USB_OHCI_LITTLE_ENDIAN
 	default y
 	---help---
 	  Say Y here to support the OHCI USB controller found in the
-	  Nintendo Wii video game console.
+	  Hollywood chipset of the Nintendo Wii video game console.
 
 config USB_OHCI_HCD_PCI
 	bool "OHCI support for PCI-bus USB controllers"

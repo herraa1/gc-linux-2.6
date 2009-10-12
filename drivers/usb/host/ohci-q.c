@@ -619,7 +619,7 @@ static void td_submit_urb (
 		/* FALLTHROUGH */
 	case PIPE_BULK:
 		if (ohci->flags & OHCI_QUIRK_WII)
-			ohci_mipc_bulk_quirk(ohci);
+			ohci_hlwd_bulk_quirk(ohci);
 
 		info = is_out
 			? TD_T_TOGGLE | TD_CC | TD_DP_OUT
@@ -653,7 +653,7 @@ static void td_submit_urb (
 	 */
 	case PIPE_CONTROL:
 		if (ohci->flags & OHCI_QUIRK_WII)
-			ohci_mipc_control_quirk(ohci);
+			ohci_hlwd_control_quirk(ohci);
 
 		info = TD_CC | TD_DP_SETUP | TD_T_DATA0;
 		td_fill (ohci, info, urb->setup_dma, 8, urb, cnt++);

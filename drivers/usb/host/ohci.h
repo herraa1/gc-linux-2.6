@@ -30,7 +30,7 @@ typedef __u16 __bitwise __hc16;
  * Note that the remaining structs allocated from dma-able memory are already
  * 32 bit fields.
  */
-#ifdef CONFIG_USB_OHCI_HCD_MIPC
+#ifdef CONFIG_USB_OHCI_HCD_HLWD
 #define ohci_fld(type)  u32
 #else
 #define ohci_fld(type)  type
@@ -568,7 +568,7 @@ static inline struct usb_hcd *ohci_to_hcd (const struct ohci_hcd *ohci)
 #define big_endian_mmio(ohci)	0		/* only little endian */
 #endif
 
-#ifdef CONFIG_USB_OHCI_HCD_MIPC
+#ifdef CONFIG_USB_OHCI_HCD_HLWD
 
 #include <asm/starlet-mini.h>
 
@@ -584,17 +584,17 @@ static inline void _ohci_writel(const struct ohci_hcd *ohci,
 	out_be32(regs, val);
 }
 
-extern void ohci_mipc_control_quirk(struct ohci_hcd *ohci);
-extern void ohci_mipc_bulk_quirk(struct ohci_hcd *ohci);
+extern void ohci_hlwd_control_quirk(struct ohci_hcd *ohci);
+extern void ohci_hlwd_bulk_quirk(struct ohci_hcd *ohci);
 
 #else
 
-static inline void ohci_mipc_control_quirk(struct ohci_hcd *ohci)
+static inline void ohci_hlwd_control_quirk(struct ohci_hcd *ohci)
 {
 	return;
 }
 
-static inline void ohci_mipc_bulk_quirk(struct ohci_hcd *ohci)
+static inline void ohci_hlwd_bulk_quirk(struct ohci_hcd *ohci)
 {
 	return;
 }
@@ -628,7 +628,7 @@ static inline void _ohci_writel (const struct ohci_hcd *ohci,
 #endif
 }
 
-#endif /* CONFIG_USB_OHCI_HCD_MIPC */
+#endif /* CONFIG_USB_OHCI_HCD_HLWD */
 
 #ifdef CONFIG_ARCH_LH7A404
 /* Marc Singer: at the time this code was written, the LH7A404

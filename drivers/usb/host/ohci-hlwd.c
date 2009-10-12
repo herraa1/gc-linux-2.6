@@ -1,7 +1,7 @@
 /*
- * drivers/usb/host/ohci-mipc.c
+ * drivers/usb/host/ohci-hlwd.c
  *
- * Nintendo Wii USB Open Host Controller Interface via 'mini' IPC (mipc).
+ * Nintendo Wii (Hollywood) USB Open Host Controller Interface.
  * Copyright (C) 2009 The GameCube Linux Team
  * Copyright (C) 2009 Albert Herranz
  *
@@ -33,13 +33,13 @@
 #include <asm/starlet.h>
 #include <asm/time.h>	/* for get_tbl() */
 
-#define DRV_MODULE_NAME "ohci-mipc"
-#define DRV_DESCRIPTION "USB Open Host Controller Interface for MINI"
+#define DRV_MODULE_NAME "ohci-hlwd"
+#define DRV_DESCRIPTION "Nintendo Wii OHCI Host Controller"
 #define DRV_AUTHOR      "Albert Herranz"
 
-#define HOLLYWOOD_EHCI_CTL 0x0d0400cc	/* vendor control register */
-#define HOLLYWOOD_EHCI_CTL_OH0INTE	(1<<11)	/* oh0 interrupt enable */
-#define HOLLYWOOD_EHCI_CTL_OH1INTE	(1<<12)	/* oh1 interrupt enable */
+#define HLWD_EHCI_CTL 0x0d0400cc	/* vendor control register */
+#define HLWD_EHCI_CTL_OH0INTE	(1<<11)	/* oh0 interrupt enable */
+#define HLWD_EHCI_CTL_OH1INTE	(1<<12)	/* oh1 interrupt enable */
 
 #define __spin_event_timeout(condition, timeout_usecs, result, __end_tbl) \
         for (__end_tbl = get_tbl() + tb_ticks_per_usec * timeout_usecs; \
@@ -48,7 +48,7 @@
 
 static DEFINE_SPINLOCK(control_quirk_lock);
 
-void ohci_mipc_control_quirk(struct ohci_hcd *ohci)
+void ohci_hlwd_control_quirk(struct ohci_hcd *ohci)
 {
 	static struct ed *ed; /* empty ED */
 	struct td *td; /* dummy TD */
@@ -124,7 +124,7 @@ void ohci_mipc_control_quirk(struct ohci_hcd *ohci)
 	spin_unlock_irqrestore(&control_quirk_lock, flags);
 }
 
-void ohci_mipc_bulk_quirk(struct ohci_hcd *ohci)
+void ohci_hlwd_bulk_quirk(struct ohci_hcd *ohci)
 {
 	/*
 	 * There seem to be issues too with the bulk list processing on the
@@ -139,7 +139,7 @@ void ohci_mipc_bulk_quirk(struct ohci_hcd *ohci)
 	udelay(250);
 }
 
-static int __devinit ohci_mipc_start(struct usb_hcd *hcd)
+static int __devinit ohci_hlwd_start(struct usb_hcd *hcd)
 {
 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
 	void __iomem *ehci_ctl;
@@ -149,7 +149,7 @@ static int __devinit ohci_mipc_start(struct usb_hcd *hcd)
 	if (error)
 		goto out;
 
-	ehci_ctl = ioremap(HOLLYWOOD_EHCI_CTL, 4);
+	ehci_ctl = ioremap(HLWD_EHCI_CTL, 4);
 	if (!ehci_ctl) {
 		printk(KERN_ERR __FILE__ ": ioremap failed\n");
 		error = -EBUSY;
@@ -158,9 +158,8 @@ static int __devinit ohci_mipc_start(struct usb_hcd *hcd)
 	}
 
 	/* enable notification of OHCI interrupts */
-	out_be32(ehci_ctl, in_be32(ehci_ctl) | 0xe0000 |
-						HOLLYWOOD_EHCI_CTL_OH0INTE |
-						HOLLYWOOD_EHCI_CTL_OH1INTE);
+	out_be32(ehci_ctl, in_be32(ehci_ctl) |
+		 0xe0000 | HLWD_EHCI_CTL_OH0INTE | HLWD_EHCI_CTL_OH1INTE);
 	iounmap(ehci_ctl);
 
 	error = ohci_run(ohci);
@@ -174,7 +173,7 @@ out:
 	return error;
 }
 
-static const struct hc_driver ohci_mipc_hc_driver = {
+static const struct hc_driver ohci_hlwd_hc_driver = {
 	.description =		hcd_name,
 	.product_desc =		"Nintendo Wii OHCI Host Controller",
 	.hcd_priv_size =	sizeof(struct ohci_hcd),
@@ -188,7 +187,7 @@ static const struct hc_driver ohci_mipc_hc_driver = {
 	/*
 	 * basic lifecycle operations
 	 */
-	.start =		ohci_mipc_start,
+	.start =		ohci_hlwd_start,
 	.stop =			ohci_stop,
 	.shutdown = 		ohci_shutdown,
 
@@ -218,7 +217,7 @@ static const struct hc_driver ohci_mipc_hc_driver = {
 
 
 static int __devinit
-ohci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
+ohci_hcd_hlwd_probe(struct of_device *op, const struct of_device_id *match)
 {
 	struct device_node *dn = op->node;
 	struct usb_hcd *hcd;
@@ -241,7 +240,7 @@ ohci_hcd_mipc_probe(struct of_device *op, const struct of_device_id *match)
 	if (error)
 		goto out;
 
-	hcd = usb_create_hcd(&ohci_mipc_hc_driver, &op->dev, DRV_MODULE_NAME);
+	hcd = usb_create_hcd(&ohci_hlwd_hc_driver, &op->dev, DRV_MODULE_NAME);
 	if (!hcd) {
 		error = -ENOMEM;
 		goto out;
@@ -307,7 +306,7 @@ out:
 	return error;
 }
 
-static int ohci_hcd_mipc_remove(struct of_device *op)
+static int ohci_hcd_hlwd_remove(struct of_device *op)
 {
 	struct usb_hcd *hcd = dev_get_drvdata(&op->dev);
 
@@ -324,7 +323,7 @@ static int ohci_hcd_mipc_remove(struct of_device *op)
 	return 0;
 }
 
-static int ohci_hcd_mipc_shutdown(struct of_device *op)
+static int ohci_hcd_hlwd_shutdown(struct of_device *op)
 {
 	struct usb_hcd *hcd = dev_get_drvdata(&op->dev);
 
@@ -335,20 +334,20 @@ static int ohci_hcd_mipc_shutdown(struct of_device *op)
 }
 
 
-static struct of_device_id ohci_hcd_mipc_match[] = {
+static struct of_device_id ohci_hcd_hlwd_match[] = {
 	{
 		.compatible = "nintendo,hollywood-ohci",
 	},
 	{},
 };
-MODULE_DEVICE_TABLE(of, ohci_hcd_mipc_match);
+MODULE_DEVICE_TABLE(of, ohci_hcd_hlwd_match);
 
-static struct of_platform_driver ohci_hcd_mipc_driver = {
+static struct of_platform_driver ohci_hcd_hlwd_driver = {
 	.name		= DRV_MODULE_NAME,
-	.match_table	= ohci_hcd_mipc_match,
-	.probe		= ohci_hcd_mipc_probe,
-	.remove		= ohci_hcd_mipc_remove,
-	.shutdown 	= ohci_hcd_mipc_shutdown,
+	.match_table	= ohci_hcd_hlwd_match,
+	.probe		= ohci_hcd_hlwd_probe,
+	.remove		= ohci_hcd_hlwd_remove,
+	.shutdown 	= ohci_hcd_hlwd_shutdown,
 	.driver		= {
 		.name	= DRV_MODULE_NAME,
 		.owner	= THIS_MODULE,
