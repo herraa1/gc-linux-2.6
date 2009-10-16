@@ -703,7 +703,7 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_name		= "745/755",
 		.cpu_features		= CPU_FTRS_750,
 		.cpu_user_features	= COMMON_USER | PPC_FEATURE_PPC_LE,
-		.mmu_features		= MMU_FTR_HPTE_TABLE | MMU_FTR_USE_HIGH_BATS,
+		.mmu_features		= MMU_FTR_HPTE_TABLE,
 		.icache_bsize		= 32,
 		.dcache_bsize		= 32,
 		.num_pmcs		= 4,
@@ -711,8 +711,6 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_750,
 		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
-		.oprofile_cpu_type      = "ppc/750",
-		.oprofile_type		= PPC_OPROFILE_G4,
 	},
 	{	/* 750CL (and "Broadway") */
 		.pvr_mask		= 0xfffff0e0,
@@ -728,6 +726,8 @@ static struct cpu_spec __initdata cpu_specs[] = {
 		.cpu_setup		= __setup_cpu_750,
 		.machine_check		= machine_check_generic,
 		.platform		= "ppc750",
+		.oprofile_cpu_type      = "ppc/750",
+		.oprofile_type		= PPC_OPROFILE_G4,
 	},
 	{	/* 750FX rev 1.x */
 		.pvr_mask		= 0xffffff00,
