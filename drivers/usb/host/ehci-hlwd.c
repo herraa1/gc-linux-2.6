@@ -46,6 +46,9 @@ static int ehci_hlwd_reset(struct usb_hcd *hcd)
 	void __iomem *ehci_ctl;
 	int error;
 
+	dbg_hcs_params(ehci, "reset");
+	dbg_hcc_params(ehci, "reset");
+
 	error = ehci_halt(ehci);
 	if (error)
 		goto out;
@@ -67,6 +70,7 @@ static int ehci_hlwd_reset(struct usb_hcd *hcd)
 
 	ehci->sbrn = 0x20;
 	error = ehci_reset(ehci);
+	ehci_port_power(ehci, 0);
 out:
 	return error;
 }
@@ -96,6 +100,7 @@ static const struct hc_driver ehci_hlwd_hc_driver = {
 	.urb_enqueue		= ehci_urb_enqueue,
 	.urb_dequeue		= ehci_urb_dequeue,
 	.endpoint_disable	= ehci_endpoint_disable,
+	.endpoint_reset		= ehci_endpoint_reset,
 
 	/*
 	 * scheduling support
@@ -113,6 +118,8 @@ static const struct hc_driver ehci_hlwd_hc_driver = {
 #endif
 	.relinquish_port	= ehci_relinquish_port,
 	.port_handed_over	= ehci_port_handed_over,
+
+	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
 };
 
 
