@@ -324,6 +324,8 @@ static int starlet_es_launch_title(struct starlet_es_device *es_dev, u64 title)
 	error = starlet_es_get_ticket_view_count(title, &count);
 	if (error)
 		return error;
+	if (!count)
+		return -ENOENT;
 
 	views = starlet_kzalloc(sizeof(*views)*count, GFP_ATOMIC);
 	if (!views) {
@@ -462,6 +464,8 @@ static int starlet_es_find_newest_title(struct starlet_es_device *es_dev,
 	error = starlet_es_get_title_count(&count);
 	if (error)
 		return error;
+	if (!count)
+		return -ENOENT;
 
 	titles = starlet_kzalloc(sizeof(*titles)*count, GFP_KERNEL);
 	if (!titles) {
