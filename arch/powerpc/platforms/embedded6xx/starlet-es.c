@@ -506,7 +506,7 @@ static int starlet_es_load_preferred_ios(struct starlet_es_device *es_dev,
 
 	error = starlet_es_find_newest_title(es_dev, &title, ios_min, ios_max);
 	if (!error)
-		return -EINVAL;
+		return -ENOENT;
 	if (error > 0) {
 		es_dev->ios_title = title;
 		error = starlet_es_launch_title(es_dev, title);
