@@ -318,7 +318,7 @@ static int starlet_es_launch_title_view(u64 title,
 static int starlet_es_launch_title(struct starlet_es_device *es_dev, u64 title)
 {
 	struct starlet_es_ticket_view *views;
-	unsigned long count;
+	unsigned long count = 0;
 	int error;
 
 	error = starlet_es_get_ticket_view_count(title, &count);
@@ -455,7 +455,7 @@ static int starlet_es_find_newest_title(struct starlet_es_device *es_dev,
 {
 	u64 *titles;
 	u64 candidate;
-	unsigned long count;
+	unsigned long count = 0;
 	int found, i;
 	int error;
 
@@ -497,7 +497,7 @@ static int starlet_es_find_newest_title(struct starlet_es_device *es_dev,
 static int starlet_es_load_preferred_ios(struct starlet_es_device *es_dev,
 					 u64 ios_min, u64 ios_max)
 {
-	u64 title;
+	u64 title = 0;
 	int error;
 
 	error = starlet_es_find_newest_title(es_dev, &title, ios_min, ios_max);
