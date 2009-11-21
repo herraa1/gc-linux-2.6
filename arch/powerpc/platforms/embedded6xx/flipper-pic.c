@@ -11,6 +11,8 @@
  * of the License, or (at your option) any later version.
  *
  */
+#define DRV_MODULE_NAME "flipper-pic"
+#define pr_fmt(fmt) DRV_MODULE_NAME ": " fmt
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -19,13 +21,6 @@
 #include <asm/io.h>
 
 #include "flipper-pic.h"
-
-
-#define DRV_MODULE_NAME "flipper-pic"
-
-#define drv_printk(level, format, arg...) \
-	 printk(level DRV_MODULE_NAME ": " format , ## arg)
-
 
 /*
  * IRQ chip hooks.
@@ -129,20 +124,19 @@ struct irq_host * __init flipper_pic_init(struct device_node *np)
 
 	retval = of_address_to_resource(np, 0, &res);
 	if (retval) {
-		drv_printk(KERN_ERR, "no io memory range found\n");
+		pr_err("no io memory range found\n");
 		return NULL;
 	}
 	io_base = ioremap(res.start, res.end - res.start + 1);
 
-	drv_printk(KERN_INFO, "controller at 0x%08x mapped to 0x%p\n",
-		   res.start, io_base);
+	pr_info("controller at 0x%08x mapped to 0x%p\n", res.start, io_base);
 
 	__flipper_quiesce(io_base);
 
 	irq_host = irq_alloc_host(np, IRQ_HOST_MAP_LINEAR, FLIPPER_NR_IRQS,
 				  &flipper_irq_host_ops, -1);
 	if (!irq_host) {
-		drv_printk(KERN_ERR, "failed to allocate irq_host\n");
+		pr_err("failed to allocate irq_host\n");
 		return NULL;
 	}
 
