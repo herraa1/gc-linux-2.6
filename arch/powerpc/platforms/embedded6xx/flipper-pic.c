@@ -228,7 +228,6 @@ int flipper_is_reset_button_pressed(void)
 	if (flipper_irq_host && flipper_irq_host->host_data) {
 		io_base = flipper_irq_host->host_data;
 		icr = in_be32(io_base + FLIPPER_ICR);
-		drv_printk(KERN_INFO, "%x\n", icr);
 		return !(icr & FLIPPER_ICR_RSS);
 	}
 	return 0;
