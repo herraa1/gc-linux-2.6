@@ -11,6 +11,8 @@
  * of the License, or (at your option) any later version.
  *
  */
+#define DRV_MODULE_NAME "hlwd-pic"
+#define pr_fmt(fmt) DRV_MODULE_NAME ": " fmt
 
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -19,13 +21,6 @@
 #include <asm/io.h>
 
 #include "hlwd-pic.h"
-
-
-#define DRV_MODULE_NAME "hlwd-pic"
-
-#define drv_printk(level, format, arg...) \
-	 printk(level DRV_MODULE_NAME ": " format , ## arg)
-
 
 #define HLWD_NR_IRQS	32
 
@@ -144,7 +139,7 @@ static void hlwd_pic_irq_cascade(unsigned int cascade_virq,
 	if (virq != NO_IRQ_IGNORE)
 		generic_handle_irq(virq);
 	else
-		drv_printk(KERN_ERR, "spurious interrupt!\n");
+		pr_err("spurious interrupt!\n");
 
 	spin_lock(&desc->lock);
 	desc->chip->ack(cascade_virq); /* IRQ_LEVEL */
@@ -174,23 +169,23 @@ struct irq_host *hlwd_pic_init(struct device_node *np)
 
 	retval = of_address_to_resource(np, 0, &res);
 	if (retval) {
-		drv_printk(KERN_ERR, "no io memory range found\n");
+		pr_err("no io memory range found\n");
 		return NULL;
 	}
 	io_base = ioremap(res.start, resource_size(&res));
 	if (!io_base) {
-		drv_printk(KERN_ERR, "ioremap failed\n");
+		pr_err("ioremap failed\n");
 		return NULL;
 	}
 
-	drv_printk(KERN_INFO, "controller at 0x%p\n", io_base);
+	pr_info("controller at 0x%08x mapped to 0x%p\n", res.start, io_base);
 
 	__hlwd_quiesce(io_base);
 
 	irq_host = irq_alloc_host(np, IRQ_HOST_MAP_LINEAR, HLWD_NR_IRQS,
 				  &hlwd_irq_host_ops, NO_IRQ_IGNORE);
 	if (!irq_host) {
-		drv_printk(KERN_ERR, "failed to allocate irq_host\n");
+		pr_err("failed to allocate irq_host\n");
 		return NULL;
 	}
 	irq_host->host_data = io_base;
