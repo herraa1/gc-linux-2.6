@@ -11,7 +11,8 @@
  * of the License, or (at your option) any later version.
  *
  */
-
+#define DRV_MODULE_NAME		"starlet-mipc"
+#define pr_fmt(fmt) DRV_MODULE_NAME ": " fmt
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -27,17 +28,10 @@
 #include "hlwd-pic.h"
 
 
-#define DRV_MODULE_NAME		"starlet-mipc"
 #define DRV_DESCRIPTION		"IPC driver for 'mini'"
 #define DRV_AUTHOR		"Albert Herranz"
 
 static char mipc_driver_version[] = "0.4i";
-
-#define drv_printk(level, format, arg...) \
-	printk(level DRV_MODULE_NAME ": " format , ## arg)
-
-#define DBG(fmt, arg...)	drv_printk(KERN_DEBUG, "%s: " fmt, \
-					   __func__, ## arg)
 
 
 /*
@@ -183,11 +177,11 @@ static void mipc_print_req(struct mipc_req *req)
 {
 	int i;
 
-	drv_printk(KERN_INFO, "req %pP = {\n", req);
-	drv_printk(KERN_CONT, "code = %08X, tag = %08X\n", req->code, req->tag);
+	pr_info("req %pP = {\n", req);
+	pr_cont("code = %08X, tag = %08X\n", req->code, req->tag);
 	for (i = 0; i < MIPC_REQ_MAX_ARGS; i++)
-		drv_printk(KERN_CONT, "arg[%d] = %08X\n", i, req->args[i]);
-	drv_printk(KERN_CONT, "}\n");
+		pr_cont("arg[%d] = %08X\n", i, req->args[i]);
+	pr_cont("}\n");
 }
 
 #ifdef DEBUG_RINGS
@@ -196,7 +190,7 @@ static void mipc_dump_ring(struct mipc_req *req, size_t count)
 	int i;
 
 	for (i = 0; i < count; i++)
-		DBG("%d: %X (%08X)\n", i, req[i].tag, req[i].code);
+		pr_devel("%d: %X (%08X)\n", i, req[i].tag, req[i].code);
 }
 #endif
 
@@ -207,14 +201,14 @@ static void mipc_print_status(struct mipc_device *ipc_dev)
 	in_size = ipc_dev->in_ring_size * sizeof(*ipc_dev->in_ring);
 	out_size = ipc_dev->out_ring_size * sizeof(*ipc_dev->out_ring);
 
-	drv_printk(KERN_INFO, "ppc: intail_idx=%u, outhead_idx=%u\n",
-		   ipc_dev->intail_idx, ipc_dev->outhead_idx);
-	drv_printk(KERN_CONT, "arm: inhead_idx=%u, outtail_idx=%u\n",
-		   mipc_peek_inhead(ipc_dev->io_base),
-		   mipc_peek_outtail(ipc_dev->io_base));
-	drv_printk(KERN_CONT, "in_ring=%uK@%p, out_ring=%uK@%p\n",
-		   in_size / 1024, ipc_dev->in_ring,
-		   out_size / 1024, ipc_dev->out_ring);
+	pr_info("ppc: intail_idx=%u, outhead_idx=%u\n",
+		ipc_dev->intail_idx, ipc_dev->outhead_idx);
+	pr_cont("arm: inhead_idx=%u, outtail_idx=%u\n",
+		mipc_peek_inhead(ipc_dev->io_base),
+		mipc_peek_outtail(ipc_dev->io_base));
+	pr_cont("in_ring=%uK@%p, out_ring=%uK@%p\n",
+		in_size / 1024, ipc_dev->in_ring,
+		out_size / 1024, ipc_dev->out_ring);
 }
 
 static int mipc_send_req(struct mipc_device *ipc_dev, unsigned long timeout,
@@ -227,7 +221,7 @@ static int mipc_send_req(struct mipc_device *ipc_dev, unsigned long timeout,
 	int error = 0;
 
 	if (mipc_peek_inhead(io_base) == mipc_get_next_intail(ipc_dev)) {
-		DBG("%s queue full\n", "ppc->arm ipc");
+		pr_err("%s queue full\n", "ppc->arm ipc");
 		__spin_event_timeout(mipc_peek_inhead(io_base) !=
 				     mipc_get_next_intail(ipc_dev),
 				     timeout, result, ctx) {
@@ -235,7 +229,7 @@ static int mipc_send_req(struct mipc_device *ipc_dev, unsigned long timeout,
 			cpu_relax();
 		}
 		if (!result) {
-			DBG("%s queue drain timed out\n", "ppc->arm ipc");
+			pr_err("%s queue drain timed out\n", "ppc->arm ipc");
 			error = -EIO;
 			goto out;
 		}
@@ -248,7 +242,7 @@ static int mipc_send_req(struct mipc_device *ipc_dev, unsigned long timeout,
 	mipc_update_csr(ipc_dev->io_base, MIPC_CSR_TXSTART);
 out:
 	if (error)
-		DBG("exit %d\n", error);
+		pr_devel("exit %d\n", error);
 	return error;
 }
 
@@ -285,7 +279,7 @@ static int mipc_recv_req(struct mipc_device *ipc_dev, unsigned long timeout,
 
 	error = __mipc_recv_req(ipc_dev, timeout, req);
 	if (error)
-		DBG("arm->ppc ipc request timed out (%d)\n", error);
+		pr_devel("arm->ppc ipc request timed out (%d)\n", error);
 	return error;
 }
 
@@ -304,14 +298,14 @@ static int mipc_recv_tagged(struct mipc_device *ipc_dev,
 
 	__spin_event_timeout(req->code == code && req->tag == tag,
 			     timeout, result, ctx) {
-		DBG("expected: code=%08X, tag=%08X\n", code, tag);
+		pr_devel("expected: code=%08X, tag=%08X\n", code, tag);
 		mipc_print_req(req);
-		DBG("+++ status\n");
+		pr_devel("+++ status\n");
 		mipc_print_status(ipc_dev);
 #ifdef DEBUG_RINGS
-		DBG("+++ in_ring\n");
+		pr_devel("+++ in_ring\n");
 		mipc_dump_ring(ipc_dev->in_ring, ipc_dev->in_ring_size);
-		DBG("+++ out_ring\n");
+		pr_devel("+++ out_ring\n");
 		mipc_dump_ring(ipc_dev->out_ring, ipc_dev->out_ring_size);
 #endif
 
@@ -320,7 +314,7 @@ static int mipc_recv_tagged(struct mipc_device *ipc_dev,
 			goto out;
 	}
 	if (!result) {
-		drv_printk(KERN_ERR, "%s: recv timed out\n", __func__);
+		pr_err("%s: recv timed out\n", __func__);
 		error = -EIO;
 		goto out;
 	} else
@@ -328,7 +322,7 @@ static int mipc_recv_tagged(struct mipc_device *ipc_dev,
 
 out:
 	if (error)
-		DBG("exit %d\n", error);
+		pr_devel("exit %d\n", error);
 	return error;
 }
 
@@ -419,13 +413,13 @@ static int mipc_flush_send(struct mipc_device *ipc_dev, unsigned long timeout)
 		cpu_relax();
 	}
 	if (!result) {
-		drv_printk(KERN_ERR, "%s: flush timed out\n", __func__);
+		pr_err("%s: flush timed out\n", __func__);
 		error = -EIO;
 		goto out;
 	}
 out:
 	if (error)
-		DBG("exit %d\n", error);
+		pr_devel("exit %d\n", error);
 	return error;
 }
 
@@ -447,7 +441,7 @@ static struct mipc_device *mipc_device_instance;
 struct mipc_device *mipc_get_device(void)
 {
 	if (!mipc_device_instance)
-		drv_printk(KERN_ERR, "uninitialized device instance!\n");
+		pr_err("uninitialized device instance!\n");
 	return mipc_device_instance;
 }
 
@@ -458,7 +452,7 @@ static int mipc_ping(struct mipc_device *ipc_dev, unsigned long timeout)
 
 	error = mipc_sendrecv1_call(ipc_dev, timeout, &resp, MIPC_SYS_PING, 0);
 	if (error)
-		DBG("exit %d\n", error);
+		pr_devel("exit %d\n", error);
 	return error;
 }
 
@@ -473,7 +467,7 @@ void mipc_##_name##_suffix(_size a, void __iomem *addr) \
 	if (!error)							\
 		return;							\
 									\
-	DBG(__stringify(_name, _suffix) "(%p,%x)\n", addr, a);		\
+	pr_devel(__stringify(_name, _suffix) "(%p,%x)\n", addr, a);	\
 	BUG();								\
 }
 
@@ -488,7 +482,7 @@ void mipc_##_name##_suffix(_size a, _size b, void __iomem *addr) \
 	if (!error)							\
 		return;							\
 									\
-	DBG(__stringify(_name, _suffix) "(%p,%x,%x)\n", addr, a, b);	\
+	pr_devel(__stringify(_name, _suffix) "(%p,%x,%x)\n", addr, a, b);\
 	BUG();								\
 }
 
@@ -504,7 +498,7 @@ _size mipc_##_name##_suffix(void __iomem *addr) \
 	if (!error)							\
 		return resp.args[0];					\
 									\
-	DBG(__stringify(_name, _suffix) "(%p)\n", addr);		\
+	pr_devel(__stringify(_name, _suffix) "(%p)\n", addr);		\
 	BUG();								\
 	return 0;							\
 }
@@ -530,7 +524,7 @@ void mipc_wmb(void)
 	if (!error)
 		return;
 
-	DBG(__stringify(_name, _suffix) "()\n");
+	pr_devel(__stringify(_name, _suffix) "()\n");
 	BUG();
 }
 
@@ -625,13 +619,13 @@ int mipc_discover(struct mipc_infohdr **hdrp)
 	/* grab mini information header location */
 	p = ioremap(0x13fffffc, 4);
 	if (!p) {
-		drv_printk(KERN_ERR, "unable to ioremap mini ipc header ptr\n");
+		pr_err("unable to ioremap mini ipc header ptr\n");
 		error = -ENOMEM;
 		goto out;
 	}
 	/* check that the header pointer points to MEM2 */
 	if (mipc_check_address(*p)) {
-		DBG("wrong mini ipc header address %pP\n", (void *)*p);
+		pr_devel("wrong mini ipc header address %pP\n", (void *)*p);
 		error = -ENODEV;
 		goto out_unmap_p;
 	}
@@ -639,7 +633,7 @@ int mipc_discover(struct mipc_infohdr **hdrp)
 	hdr = (struct mipc_infohdr *)ioremap_prot(*p, sizeof(*hdr),
 						      PAGE_KERNEL);
 	if (!hdr) {
-		drv_printk(KERN_ERR, "unable to ioremap mini ipc header\n");
+		pr_err("unable to ioremap mini ipc header\n");
 		error = -ENOMEM;
 		goto out_unmap_p;
 	}
@@ -648,29 +642,30 @@ int mipc_discover(struct mipc_infohdr **hdrp)
 	memcpy(magic, hdr->magic, 3);
 	magic[3] = 0;
 	if (memcmp(magic, "IPC", 3)) {
-		DBG("wrong magic \"%s\"\n", magic);
+		pr_devel("wrong magic \"%s\"\n", magic);
 		error = -ENODEV;
 		goto out_unmap_hdr;
 	}
 	if (hdr->version < MIPC_MIN_VER && hdr->version > MIPC_MAX_VER) {
-		drv_printk(KERN_ERR, "unsupported mini ipc version %d"
+		pr_err("unsupported mini ipc version %d"
 			   " (min %d, max %d)\n", hdr->version,
 			   MIPC_MIN_VER, MIPC_MAX_VER);
 		error = -ENODEV;
 		goto out_unmap_hdr;
 	}
 	if (mipc_check_address(hdr->mem2_boundary)) {
-		DBG("invalid mem2_boundary %pP\n", (void *)hdr->mem2_boundary);
+		pr_err("invalid mem2_boundary %pP\n",
+		       (void *)hdr->mem2_boundary);
 		error = -EINVAL;
 		goto out_unmap_hdr;
 	}
 	if (mipc_check_address(hdr->ipc_in)) {
-		DBG("invalid ipc_in %pP\n", (void *)hdr->ipc_in);
+		pr_err("invalid ipc_in %pP\n", (void *)hdr->ipc_in);
 		error = -EINVAL;
 		goto out_unmap_hdr;
 	}
 	if (mipc_check_address(hdr->ipc_out)) {
-		DBG("invalid ipc_out %pP\n", (void *)hdr->ipc_out);
+		pr_err("invalid ipc_out %pP\n", (void *)hdr->ipc_out);
 		error = -EINVAL;
 		goto out_unmap_hdr;
 	}
@@ -689,13 +684,13 @@ out:
 
 static void mipc_print_infohdr(struct mipc_infohdr *hdr)
 {
-	drv_printk(KERN_INFO, "magic=%c%c%c, version=%d, mem2_boundary=%pP\n",
-		   hdr->magic[0], hdr->magic[1], hdr->magic[2],
-		   hdr->version,
-		   (void *)hdr->mem2_boundary);
-	drv_printk(KERN_CONT, "ipc_in[%u] @ %pP, ipc_out[%u] @ %pP\n",
-		   hdr->ipc_in_size, (void *)hdr->ipc_in,
-		   hdr->ipc_out_size, (void *)hdr->ipc_out);
+	pr_info("magic=%c%c%c, version=%d, mem2_boundary=%pP\n",
+		hdr->magic[0], hdr->magic[1], hdr->magic[2],
+		hdr->version,
+		(void *)hdr->mem2_boundary);
+	pr_cont("ipc_in[%u] @ %pP, ipc_out[%u] @ %pP\n",
+		hdr->ipc_in_size, (void *)hdr->ipc_in,
+		hdr->ipc_out_size, (void *)hdr->ipc_out);
 }
 
 static int mipc_do_simple_tests = 0;
@@ -728,7 +723,7 @@ static void mipc_simple_tests(struct mipc_device *ipc_dev)
 
 	gpio = mipc_ioremap(0x0d8000c0, 4);
 	if (!gpio) {
-		DBG("ioremap failed\n");
+		pr_err("ioremap failed\n");
 		return;
 	}
 
@@ -754,15 +749,15 @@ static void mipc_simple_tests(struct mipc_device *ipc_dev)
 		t_mipc_ping = get_tbl() - t0;
 	}
 
-	drv_printk(KERN_INFO, "io timings in timebase ticks"
-		   " (1 usec = %lu ticks)\n", tb_ticks_per_usec);
-	drv_printk(KERN_CONT, "mmio: read=%lu (%lu ns), write=%lu (%lu ns)\n",
-		   t_read, tbl_to_ns(t_read), t_write, tbl_to_ns(t_write));
-	drv_printk(KERN_CONT, "mipc: read=%lu (%lu ns), write=%lu (%lu ns)\n",
-		   t_mipc_read, tbl_to_ns(t_mipc_read),
-		   t_mipc_write, tbl_to_ns(t_mipc_write));
-	drv_printk(KERN_CONT, "mipc: ping=%lu (%lu ns)\n",
-		   t_mipc_ping, tbl_to_ns(t_mipc_ping));
+	pr_info("io timings in timebase ticks"
+		" (1 usec = %lu ticks)\n", tb_ticks_per_usec);
+	pr_cont("mmio: read=%lu (%lu ns), write=%lu (%lu ns)\n",
+		t_read, tbl_to_ns(t_read), t_write, tbl_to_ns(t_write));
+	pr_cont("mipc: read=%lu (%lu ns), write=%lu (%lu ns)\n",
+		t_mipc_read, tbl_to_ns(t_mipc_read),
+		t_mipc_write, tbl_to_ns(t_mipc_write));
+	pr_cont("mipc: ping=%lu (%lu ns)\n",
+		t_mipc_ping, tbl_to_ns(t_mipc_ping));
 
 	mipc_iounmap(gpio);
 }
@@ -775,10 +770,8 @@ static void mipc_shutdown_mini_devs(struct mipc_device *ipc_dev)
 	error = mipc_sendrecv1_call(ipc_dev, MIPC_DEV_TIMEOUT, &resp,
 				    _MIPC(_MIPC_SLOW, _MIPC_DEV_SDHC,
 					   _MIPC_SDHC_EXIT), 0);
-	if (error) {
-		drv_printk(KERN_ERR, "unable to shutdown mini SDHC subsystem"
-			   ", you are DOOMED!\n");
-	}
+	if (error)
+		pr_err("unable to shutdown mini SDHC subsystem\n");
 }
 
 static void mipc_starlet_fixups(struct mipc_device *ipc_dev)
@@ -806,16 +799,15 @@ static void mipc_init_ahbprot(struct mipc_device *ipc_dev)
 
 	initial_ahbprot = mipc_readl(hw_ahbprot);
 	if (initial_ahbprot != 0xffffffff) {
-		drv_printk(KERN_INFO, "AHBPROT=%08X (before)\n",
-			   initial_ahbprot);
+		pr_debug("AHBPROT=%08X (before)\n", initial_ahbprot);
 		mipc_writel(0xffffffff, hw_ahbprot);
 	}
 
 	ahbprot = mipc_readl(hw_ahbprot);
 	if (initial_ahbprot != ahbprot)
-		drv_printk(KERN_INFO, "AHBPROT=%08X (after)\n", ahbprot);
+		pr_debug("AHBPROT=%08X (after)\n", ahbprot);
 	if (ahbprot != 0xffffffff)
-		drv_printk(KERN_ERR, "failed to set AHBPROT\n");
+		pr_err("failed to set AHBPROT\n");
 }
 
 static int mipc_init(struct mipc_device *ipc_dev, struct resource *mem, int irq)
@@ -827,7 +819,7 @@ static int mipc_init(struct mipc_device *ipc_dev, struct resource *mem, int irq)
 
 	error = mipc_discover(&hdr);
 	if (error) {
-		drv_printk(KERN_ERR, "unable to find mini ipc instance\n");
+		pr_err("unable to find mini ipc instance\n");
 		goto out;
 	}
 
@@ -863,7 +855,7 @@ static int mipc_init(struct mipc_device *ipc_dev, struct resource *mem, int irq)
 	if (error)
 		goto out;
 
-	drv_printk(KERN_INFO, "ping OK\n");
+	pr_info("ping OK\n");
 	if (mipc_do_simple_tests)
 		mipc_simple_tests(ipc_dev);
 
@@ -895,7 +887,7 @@ static int mipc_do_probe(struct device *dev, struct resource *mem, int irq)
 
 	ipc_dev = kzalloc(sizeof(*ipc_dev), GFP_KERNEL);
 	if (!ipc_dev) {
-		drv_printk(KERN_ERR, "failed to allocate ipc_dev\n");
+		pr_err("failed to allocate ipc_dev\n");
 		error = -ENOMEM;
 		goto out;
 	}
@@ -909,7 +901,7 @@ static int mipc_do_probe(struct device *dev, struct resource *mem, int irq)
 		goto out;
 	}
 
-	drv_printk(KERN_INFO, "ready\n");
+	pr_info("ready\n");
 	hlwd_pic_probe();
 
 out:
@@ -959,7 +951,7 @@ static int mipc_of_probe(struct of_device *odev,
 
 	error = of_address_to_resource(odev->node, 0, &mem[0]);
 	if (error) {
-		drv_printk(KERN_ERR, "no io memory range found (%d)\n", error);
+		pr_err("no io memory range found (%d)\n", error);
 		goto out;
 	}
 
@@ -1002,8 +994,7 @@ static struct of_platform_driver mipc_of_driver = {
 
 static int __init mipc_init_module(void)
 {
-	drv_printk(KERN_INFO, "%s - version %s\n", DRV_DESCRIPTION,
-		   mipc_driver_version);
+	pr_info("%s - version %s\n", DRV_DESCRIPTION, mipc_driver_version);
 
 	return of_register_platform_driver(&mipc_of_driver);
 }
