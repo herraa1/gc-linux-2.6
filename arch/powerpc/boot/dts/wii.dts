@@ -82,7 +82,7 @@
 		ranges = <0x0c000000 0x0c000000 0x00010000
 			  0x0d000000 0x0d000000 0x00010000
 			  0x0d040000 0x0d040000 0x00050000
-			  0x0d800000 0x0d800000 0x00001000
+			  0x0d800000 0x0d800000 0x00007000
 			  0x133e0000 0x133e0000 0x00c20000>;
 
 		video@0c002000 {
@@ -179,7 +179,7 @@
 			       0x13fffffc 0x4>;	/* mini header pointer */
 
 			ranges = <0x0d040000 0x0d040000 0x00050000
-				  0x0d800000 0x0d800000 0x00001000
+				  0x0d800000 0x0d800000 0x00007000
 				  0x133e0000 0x133e0000 0x00c20000>;
 
 			PIC1: pic1@0d800030 {
@@ -188,6 +188,12 @@
 				reg = <0x0d800030 0x8>;
 				interrupt-controller;
 				interrupts = <14>;
+				interrupt-parent = <&PIC0>;
+			};
+			disk@0d806000 {
+				compatible = "nintendo,hollywood-disk";
+				reg = <0x0d806000 0x40>;
+				interrupts = <2>;
 				interrupt-parent = <&PIC0>;
 			};
 			ehci@0d040000 {
