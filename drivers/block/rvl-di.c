@@ -41,6 +41,7 @@
 #include <linux/timer.h>
 #include <linux/io.h>
 
+#include <asm/starlet.h>
 #include <asm/dma-mapping.h>
 
 
@@ -1805,16 +1806,21 @@ static int __init di_of_probe(struct of_device *odev,
 			      const struct of_device_id *match)
 {
 	struct resource res;
-	int retval;
+	int error = -ENODEV;
 
-	retval = of_address_to_resource(odev->node, 0, &res);
-	if (retval) {
+	if (starlet_get_ipc_flavour() != STARLET_IPC_MINI)
+		goto out;
+
+	error = of_address_to_resource(odev->node, 0, &res);
+	if (error) {
 		pr_err("no io memory range found\n");
-		return -ENODEV;
+		goto out;
 	}
 
-	return di_do_probe(&odev->dev,
-			   &res, irq_of_parse_and_map(odev->node, 0));
+	error = di_do_probe(&odev->dev, &res,
+			    irq_of_parse_and_map(odev->node, 0));
+out:
+	return error;
 }
 
 static int __exit di_of_remove(struct of_device *odev)
